@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.4
 # -*- coding: utf-8 -*-
 
 # Created by Cameron Gagnon
@@ -49,30 +49,34 @@ USERAGENT = "Reddit wallpaper changer script /u/countfapula69 " \
 	    "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
 	       "picture-uri " \
-	       "file:///media/cameron/Fresh500/pictures/"\
-	       			  "wallofpapers/reddit/"
+	       "file:///media/cameron/Fresh500/pictures/wallofpapers"\
+								"/reddit/"
 DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
-						        "/reddit/"
+						        	"/reddit/"
 MINWIDTH = 1366
 MINHEIGHT = 768
 CYCLETIME = .05 #in minutes
+VERBOSE = False
+DEBUG = False
 
 #declared as global in functions so we can
 #decrement MAXPOSTS when we encounter an img
 #that != width/height requirements. This is
 #because in Cycle_wallpaper, it will cycle
 #the list of images from 0 to MAXPOSTS
-MAXPOSTS = 10
+MAXPOSTS = 5
 image_list = []
 sql = sqlite3.connect('wallpaper.db')
 cur = sql.cursor()
 
-
 #make sure to have a file in the same directory with your username
 #on the first line, and password on the second
-def get_wallpaper():
+def Get_wallpaper():
 	global cur
 	global sql
+	
+	Parse_cmd_args()
+	
 	with open(CREDENTIALS, 'r') as infile:
 		#removes the newline character at end of
 		#each line so login will work
@@ -92,7 +96,7 @@ def get_wallpaper():
 	print("Pulling top " + str(MAXPOSTS) + " posts\n")
 	Get_data_from_pic(subreddit)
 
-	Cycle_wallpaper(SETWALLPAPER)
+	Cycle_wallpaper()
 	
 	sql.close()
 
@@ -133,23 +137,50 @@ def Login(USERNAME, PASSWORD):
 		print("ERROR: You do not appear to be "
 		      "connected to Reddit. Exiting")
 		sys.exit(1)
-	
+
 ####################################################################
 #REQUIRES url of image to be renamed 
 #MODIFIES nothing
 #EFFECTS  Outputs the image title of the photo being downloaded
 #	  instead of the long URL it comes in as
-def Title_from_url(url):
+def Title_from_url(url, pid):
 	try:
 		#finds last forward slash in index and then slices
 		#the url up to that point + 1 to just get the image
 		#title
-		remove = url.rindex('/')			
-		image_name =  url[-(len(url) - remove - 1):]
-		if image_name.rfind(".") == -1:
-			image_name += ".jpg"
+		regex_result = re.findall(\
+				r'^(?:https?:\/\/)?(?:www\.)?([^\/]+)',\
+						 url, re.IGNORECASE)
+		if VERBOSE:######################################
+			print("Regex (domain) from URL is: ",
+			      regex_result, '\n')
+		if regex_result[0] == "i.imgur.com" or \
+		   regex_result[0] == "imgur.com":
 
-		return image_name
+			remove = url.rindex('/')			
+			image_name =  url[-(len(url) - remove - 1):]
+			#makes the url have the same domain instead of
+			#just imgur.com
+		
+			if image_name.rfind(".") == -1:
+				image_name += ".jpg"
+				url = "http://i.imgur.com/" + image_name
+				if VERBOSE:#######################
+					print("Image_name is: " + 
+					      image_name + '\n')
+				return image_name, url
+			else:
+				if VERBOSE:#######################
+					print("Image_name is: " +
+					      image_name + '\n')
+				return image_name, url
+		else:
+			remove = url.rindex('/')			
+			image_name =  url[-(len(url) - remove - 1):]
+			if VERBOSE:###############################
+				print("Image_name is: " + image_name + 
+				      '\n')
+			return pid, url
 
 	except ValueError:
 		print("Error in finding title from URL")
@@ -165,11 +196,10 @@ def Already_downloaded(pid, image_name):
 	global cur
 	cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
 	result = cur.fetchone()
-#print(result)
-	
-	if result and not Check_width_height(result[2], \
-					     result[3], image_name):
-#print("Image " + image_name + " already downloaded.")
+
+	if VERBOSE:#######################
+		print("Result of Already_downloaded is: ", result, '\n')
+	if result and not Check_width_height(pid):
 		return True
 	elif result:
 		print("Picture: " + image_name + " is already "
@@ -187,6 +217,10 @@ def Already_downloaded(pid, image_name):
 def Insert_to_db(pid, image_name, width, height):
 	global cur
 	global sql
+	if VERBOSE:#######################
+		print("Data to insert\nPid: " + str(pid) +
+			 "\nimage_name: " + "\nwidth: " + str(width) + 
+			 "\nheight: " + str(height) + "\n") 
 	cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?)',\
 				[pid, image_name, width, height])
 	sql.commit()
@@ -199,11 +233,14 @@ def Insert_to_db(pid, image_name, width, height):
 def Valid_width_height(submission_title, pid, image_name):
 	try:
 		result = re.findall(\
-		r'([0-9]*)(\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9]*)',\
+		r'(?:\[\s?|\(\s?)([0-9]*)(?:\s*\*\s*|\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9]*)(?:\]\s?|\)\s?)',\
 	 				submission_title, re.IGNORECASE)	
-#print(result)#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		if VERBOSE:#####################
+			print("Regex from width/height: ")
+			print(result)
+			print('\n')
 		result1 = result[0][0]
-		result2 = result[0][2]
+		result2 = result[0][1]
 		Insert_to_db(pid, image_name, result1, result2)		
 		return Lookup_width_height(pid, image_name)
 
@@ -216,7 +253,16 @@ def Valid_width_height(submission_title, pid, image_name):
 #MODIFIES nothing
 #EFFECTS  Returns true if the width and height are above specified
 #	  dimensions
-def Check_width_height(width, height, image_name):
+def Check_width_height(pid):
+	cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
+	lookup = cur.fetchone()
+
+	if VERBOSE:#############
+		print("Lookup from Check_width_height: ", lookup, '\n')
+
+	width = lookup[2]
+	height = lookup[3]
+
 	try:
 		if ((int(width) > MINWIDTH) and \
 		    (int(height) > MINHEIGHT)):
@@ -224,8 +270,8 @@ def Check_width_height(width, height, image_name):
 		else:
 			return False
 	except ValueError:
-		print("Incorrect type comparison for width and height "
-		      "most likely an incorrect parsing of title.")
+		print("Incorrect type comparison for width and height"
+		      " most likely an incorrect parsing of title.")
 
 ####################################################################
 #REQUIRES width, height and ID of the image
@@ -233,12 +279,7 @@ def Check_width_height(width, height, image_name):
 #EFFECTS  Returns true if the image is greater than the width and 
 # 	  height requirements set by the user.
 def Lookup_width_height(pid, image_name):
-	cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
-	lookup = cur.fetchone()
-
-	width = lookup[2]
-	height = lookup[3]
-	if  Check_width_height(width, height, image_name):
+	if  Check_width_height(pid):
 		print("Image: " + image_name + " fits required "
 		      "size.")
 
@@ -252,25 +293,25 @@ def Lookup_width_height(pid, image_name):
 #EFFECTS  Sets the image_name to the title of the download.
 #	  Passes out the full download location. Opens the file from
 #	  the specified url.
-def Set_up_url(url):
+def Set_up_url(url, image_name):
 	#it appears this next line does not affect the return value
 	#although it may announce the request to the server, giving 
 	#them more details about the request
 	picdl = urllib.request.Request(url, \
 		headers = { 'User-Agent': USERAGENT})
 
-	image_name = Title_from_url(url)
 	local_save = DOWNLOADLOCATION + image_name
-	try:
-		url.rindex(".jpg")
-	except ValueError:
-		url += ".jpg"
+	
 	#returns a tuple that is assigned correctly after
 	#this function returns
-#print(url)#######################################
-	picdl = urllib.request.urlopen(url)
-	return image_name, local_save, picdl, url
-
+	if VERBOSE:#########################################
+		print("URL is: " + url + '\n')
+	try:
+		picdl = urllib.request.urlopen(picdl)
+		return local_save, picdl
+	except urllib.error.HTTPError as err:
+		print("ERROR occured in Set_up_url!!!!\n")
+		print(err)
 ####################################################################
 #REQUIRES url, image_name, local_save, cur, sql
 #MODIFIES file on hard drive, image_list
@@ -301,25 +342,25 @@ def Get_data_from_pic(subreddit):
 	global sql
 	
 	for post in subreddit.get_hot(limit = MAXPOSTS):
+		if DEBUG:
+			pprint.pprint(vars(post))
 		pid = post.id
 		url = post.url
 		submission_title = post.title
-		image_name = Title_from_url(url)
-
-#print(submission_title)
+		image_name, url = Title_from_url(url, pid)
 
 		if not Already_downloaded(pid, image_name):
 			if  Valid_width_height(submission_title,\
 					pid, image_name):
-#pprint.pprint(vars(post))
-				image_name, local_save, picdl, \
-					url = Set_up_url(url)
+
+				local_save, picdl = Set_up_url(\
+						   url, image_name)
 
 				Img_download(url, image_name, \
 					    local_save, picdl, pid)
 			else:
 				MAXPOSTS -= 1
-		elif not Lookup_width_height(pid, image_name):
+		elif not Check_width_height(pid):
 			
 			#Append the pic if already downloaded so
 			#when Cycle_wallpaper is called, it will
@@ -345,13 +386,17 @@ def Get_data_from_pic(subreddit):
 #	  wallpaper via the command line
 #MODIFIES wallpaper on backgroun
 #EFFECTS  Sets the wallpaper of the system to be image_name
-def Set_wallpaper(setpaper, image_name):
-	try:		
-		subprocess.call(args = setpaper + image_name, 
+def Set_wallpaper(image_name):
+	try:				
+		subprocess.call(args = SETWALLPAPER + image_name, 
 				shell=True)
-		print("Wallpaper should be set to: " + image_name \
-		      + "\n") 
-	except:	
+		if VERBOSE:
+			print("Wallpaper should be set to: {name}"
+			      " Cycle time: {cycletime:>d} seconds".format(
+			       name = image_name,
+			       cycletime = int(CYCLETIME*60)))
+			        
+	except:
 		print("Error setting wallpaper, it is likely the "
 		      "file path is not 100% correct. Make sure "
 		      "there is a foward slash at the end of the "
@@ -363,17 +408,62 @@ def Set_wallpaper(setpaper, image_name):
 #MODIFIES wallpaper background of the computer
 #EFFECTS  Cycles through the wallpapers that are given by the titles
 #	  in the image_list list, based on the CYCLETIME
-def Cycle_wallpaper(SETWALLPAPER):
+def Cycle_wallpaper():
 	global image_list
-	global MAXPOSTS
 	
-#print(MAXPOSTS)#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	if VERBOSE:
+		print("\nMAXPOSTS is: ", MAXPOSTS, '\n')
 	
 	for i in range(0, MAXPOSTS, 1):
-#print(image_list[i]#!!!!!!!!!!!!!!!!!!)
-		Set_wallpaper(SETWALLPAPER, image_list[i])
+		Set_wallpaper(image_list[i])
 		time.sleep(CYCLETIME*60)
+	print('\n')
+
+###################################################################
+#REQUIRES command line args
+#MODIFIES some of the global variables declared at top of program
+#EFFECTS  Sets variables to modify output of program and change 
+#	  default options to user specified ones.
+def Parse_cmd_args():
+	global VERBOSE
+	global MINWIDTH
+	global MINHEIGHT
+	parser = argparse.ArgumentParser(description="Downloads"
+		" images from user specified subreddits and sets"
+		" them as the wallpaper.")
+	parser.add_argument("-v", "--verbose", action="store_true",
+			    help="Verbose output of program")
+	parser.add_argument("-mw", "--minwidth", type = int,
+			    help="Minimum width of picture required "
+				 "to download", default = 1024)
+	parser.add_argument("-mh", "--minheight", type = int,
+			    help="Minimum height of picture required "
+				 "to download", default = 768)
+	parser.add_argument("-mp", "--maxposts", type = int,
+			    help="Amount of images to check and "
+				 "download", default = 5)
+	parser.add_argument("-ct", "--cycletime", type = float,
+			    help="Amount of time (in minutes) each image "
+				 "will be set as wallpaper", default = .05)
+	parser.add_argument("-d", "--debug", action = "store_true", 
+			    help = "Aids in debugging of program")
+	args = parser.parse_args()
+
+	MINWIDTH = int(args.minwidth)
+	MINHEIGHT = int(args.minheight)
+	MAXPOSTS = int(args.maxposts)
+	CYCLETIME = float(args.cycletime)
+
+	if args.verbose:
+		VERBOSE = True
+	else:
+		VERBOSE = False	
+
+	if args.debug:
+		DEBUG = True
+	else:
+		DEBUG = False
 
 ###################################################################
 if __name__ == '__main__':
-	get_wallpaper()
+	Get_wallpaper()
