@@ -44,7 +44,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "spaceporn+earthporn"
+SUBREDDITS = "spaceporn+earthporn+waterporn"
 USERAGENT = "Reddit wallpaper changer script /u/countfapula69 " \
 	    "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -218,9 +218,9 @@ def Insert_to_db(pid, image_name, width, height):
 	global cur
 	global sql
 	if VERBOSE:#######################
-		print("Data to insert\nPid: " + str(pid) +
-			 "\nimage_name: " + "\nwidth: " + str(width) + 
-			 "\nheight: " + str(height) + "\n") 
+		print("Data to insert\nPid: ", str(pid),
+			 "\nimage_name: ", image_name, "\nwidth: ",
+			 str(width), "\nheight: ", str(height), '\n') 
 	cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?)',\
 				[pid, image_name, width, height])
 	sql.commit()
@@ -234,11 +234,13 @@ def Valid_width_height(submission_title, pid, image_name):
 	try:
 		result = re.findall(\
 		r'(?:\[\s?|\(\s?)([0-9]*)(?:\s*\*\s*|\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9]*)(?:\]\s?|\)\s?)',\
-	 				submission_title, re.IGNORECASE)	
+	 				submission_title, re.IGNORECASE)
+		result = re.findall(\
+		r'(?:\s?|\(\s?)([0-9,]*)(?:\s*\*\s*|\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9,]*)(?:\s?|\)\s?)',\
+						submission_title, re.IGNORECASE)	
 		if VERBOSE:#####################
 			print("Regex from width/height: ")
-			print(result)
-			print('\n')
+			print(result, '\n')
 		result1 = result[0][0]
 		result2 = result[0][1]
 		Insert_to_db(pid, image_name, result1, result2)		
@@ -428,6 +430,9 @@ def Parse_cmd_args():
 	global VERBOSE
 	global MINWIDTH
 	global MINHEIGHT
+	global CYCLETIME
+	global DEBUG
+	global MAXPOSTS
 	parser = argparse.ArgumentParser(description="Downloads"
 		" images from user specified subreddits and sets"
 		" them as the wallpaper.")
@@ -442,7 +447,7 @@ def Parse_cmd_args():
 	parser.add_argument("-mp", "--maxposts", type = int,
 			    help="Amount of images to check and "
 				 "download", default = 5)
-	parser.add_argument("-ct", "--cycletime", type = float,
+	parser.add_argument("-t", "--cycletime", type = float,
 			    help="Amount of time (in minutes) each image "
 				 "will be set as wallpaper", default = .05)
 	parser.add_argument("-d", "--debug", action = "store_true", 
@@ -461,8 +466,10 @@ def Parse_cmd_args():
 
 	if args.debug:
 		DEBUG = True
+		VERBOSE = True
 	else:
 		DEBUG = False
+		VERBOSE = False
 
 ###################################################################
 if __name__ == '__main__':
