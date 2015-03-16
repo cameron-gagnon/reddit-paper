@@ -10,11 +10,12 @@
 # or improvements to this code,
 # feel free to email me and we can go from there.
 # I'd love to help anyone use this to make their
-# desktop backgrounds pretty. If you're having trouble
-# using this program, please reach out and I can try
+# desktop backgrounds always look awesome.
+# If you're having trouble using this program,
+# please reach out and I can try
 # my best to help you out!
 #
-# This is under the GPL license, so use it
+# This is under the GNU GPL V3 so use it
 # and modify it however you want
 #
 # Inspiration for this program came
@@ -174,6 +175,11 @@ def Title_from_url(url, pid):
 					print("Image_name is: " +
 					      image_name + '\n')
 				return image_name, url
+		elif (regex_result[0].find("flickr") != -1):
+			# have not handled flickr downloads yet
+			print("Flickr support has not yet been added.\n")
+			return False, False
+
 		else:
 			remove = url.rindex('/')			
 			image_name =  url[-(len(url) - remove - 1):]
@@ -184,7 +190,7 @@ def Title_from_url(url, pid):
 
 	except ValueError:
 		print("Error in finding title from URL")
-		sys.exit(1)
+		return False, False
 
 ####################################################################
 #REQUIRES id of submission in question
@@ -350,37 +356,40 @@ def Get_data_from_pic(subreddit):
 		url = post.url
 		submission_title = post.title
 		image_name, url = Title_from_url(url, pid)
-
-		if not Already_downloaded(pid, image_name):
-			if  Valid_width_height(submission_title,\
-					pid, image_name):
-
-				local_save, picdl = Set_up_url(\
-						   url, image_name)
-
-				Img_download(url, image_name, \
-					    local_save, picdl, pid)
-			else:
-				MAXPOSTS -= 1
-		elif not Check_width_height(pid):
+		if (not image_name or not url):
+			MAXPOSTS -= 1
 			
-			#Append the pic if already downloaded so
-			#when Cycle_wallpaper is called, it will
-			#still use the current MAXPOSTS posts on
-			#Reddit.
-
-			#The reason for this is if a search is
-			#cancelled before all images are
-			#downloaded, then some images will be
-			#available but we do not want to download
-			#them again. Thus they will not be added
-			#to the current image_list until this
-			#statement takes place.
-			
-			MAXPOSTS -= 1 
-
 		else:
-			image_list.append(image_name)
+			if not Already_downloaded(pid, image_name):
+				if  Valid_width_height(submission_title,\
+						pid, image_name):
+	
+					local_save, picdl = Set_up_url(\
+							   url, image_name)
+	
+					Img_download(url, image_name, \
+						    local_save, picdl, pid)
+				else:
+					MAXPOSTS -= 1
+			elif not Check_width_height(pid):
+				
+				#Append the pic if already downloaded so
+				#when Cycle_wallpaper is called, it will
+				#still use the current MAXPOSTS posts on
+				#Reddit.
+	
+				#The reason for this is if a search is
+				#cancelled before all images are
+				#downloaded, then some images will be
+				#available but we do not want to download
+				#them again. Thus they will not be added
+				#to the current image_list until this
+				#statement takes place.
+				
+				MAXPOSTS -= 1 
+	
+			else:
+				image_list.append(image_name)
 
 ####################################################################
 #REQUIRES setpaper is the command particular to each 
@@ -415,6 +424,8 @@ def Cycle_wallpaper():
 	
 	if VERBOSE:
 		print("\nMAXPOSTS is: ", MAXPOSTS, '\n')
+
+	print(MAXPOSTS, "images to rotate\n")
 	
 	for i in range(0, MAXPOSTS, 1):
 		Set_wallpaper(image_list[i])
