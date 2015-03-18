@@ -45,7 +45,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "spaceporn+earthporn+waterporn+technologyporn+imaginarystarscapes"
+SUBREDDITS = "earthporn+waterporn+spaceporn"
 USERAGENT = "Reddit wallpaper changer script /u/countfapula69 " \
 	    "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
