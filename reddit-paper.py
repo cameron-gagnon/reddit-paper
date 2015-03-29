@@ -187,10 +187,18 @@ def Title_from_url(url, pid):
                     print("Image_name is: " +
                          image_name + '\n')
                 return image_name, url
+
+        elif (regex_result[0].find("staticflickr") != -1):
+            remove = url.rindex('/')                        
+            image_name =  url[-(len(url) - remove - 1):]
+            
+            return image_name, url
+
         elif (regex_result[0].find("flickr") != -1):
-            # have not handled flickr downloads yet
+            # have not handled non-staticflickr downloads yet
             print("Flickr support has not yet been added.\n")
             return False, False
+
  
         else:
             remove = url.rindex('/')
@@ -255,10 +263,7 @@ def Insert_to_db(pid, image_name, width, height):
 def Valid_width_height(submission_title, pid, image_name):
     try:
         result = re.findall(\
-        r'(?:\[\s?|\(\s?)([0-9]*)(?:\s*\*\s*|\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9]*)(?:\]\s?|\)\s?)',\
-                                        submission_title, re.IGNORECASE)
-        result = re.findall(\
-        r'(?:\s?|\(\s?)([0-9,]*)(?:\s*\*\s*|\s*x\s*|x|\s*\xc3\x97\s*|\xc3\x97|\s*\xd7\s*|\xd7)([0-9,]*)(?:\s?|\)\s?)',\
+                r'([0-9,]*)(?:\s*\*\s*|\s*x\s*|\s*\xc3\x97\s*|\s*\xd7\s*)([0-9,]*)',\
                                                 submission_title, re.IGNORECASE)        
         if VERBOSE:#####################
             print("Regex from width/height: ")
@@ -301,7 +306,7 @@ def Check_width_height(pid):
             return False
     except ValueError:
         print("Incorrect type comparison for width and height"
-              " most likely an incorrect parsing of title.")
+              " most likely an incorrect parsing of title.\n")
 
 ####################################################################
 #REQUIRES width, height and ID of the image
