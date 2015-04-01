@@ -113,10 +113,12 @@ def Connected(url):
                  headers={'User-Agent' : USERAGENT})
         url = urllib.request.urlopen(uaurl,
                                      timeout = 3)
+
+        content = url.read().decode('utf-8')
+        json.loads(content)
         url.close()
         return True
-    except (ConnectionError, HTTPError, URLError,\
-             timeout):
+    except (AttributeError, ValueError):
         return False
 
 #REQUIRES statement to ouput
@@ -136,21 +138,19 @@ def Connected(url):
 #EFFECTS  Attempts to login to Reddit using the provided username
 #         and password.
 def Login(USERNAME, PASSWORD):
-    print("Logging in as " + USERNAME)
-    try:
-        r = praw.Reddit(user_agent = USERAGENT)
-        r.login(USERNAME, PASSWORD)
-        return r
-    except (requests.packages.urllib3.exceptions.SSLError, ProtocolError,
-            ConnectionError):
-        print("ERROR: You do not appear to be connected to"
-              " the internet, please check your connection"
-              " and try again later.")
     
-    if not Connected("http://www.reddit.com"):
-        print("ERROR: You do not appear to be "
-              "connected to Reddit. Exiting")
-        sys.exit(1)
+    print("Logging in as " + USERNAME + "...")
+    
+    if not Connected("https://www.reddit.com/.json"):
+        print("ERROR: You do not appear to be connected to Reddit.com",
+              "this is likely due to redirect by the internet connection",
+              "you are on. Check to make sure no login is required, and try",
+              "again.")
+        sys.exit(0)
+
+    r = praw.Reddit(user_agent = USERAGENT)
+    r.login(USERNAME, PASSWORD)
+    return r
 
 ####################################################################
 #REQUIRES url of image to be renamed 
