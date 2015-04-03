@@ -7,3 +7,6 @@
 
 4/1/2015
 * added redirect away from Reddit.com support (e.g. if on hotel internet and need to sign in)
+
+4/3/2015
+* fixed regex for title to not match any 'x' in title and just the 'width x height'
