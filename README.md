@@ -10,20 +10,12 @@ NOTE: At the end of the program, it will always terminate with something of the 
 
 TODO LIST:
 
-fix regex on parsing of title to find width and height
-
-add flickr support
-
-add different subreddit's support, such as ones that don't list width && height in title of post, to avoid
-
-incorrect parsing of title everytime
-
-tidy up output
-
-create debugging output to log file
-
-save photos into folders by date, then access these folders to set the correct images
-
-Add Windows support, then Mac
-
-create gui
+*fix regex on parsing of title to find width and height
+*add flickr support
+*add different subreddit's support, such as ones that don't list width && height in title of post, to avoid
+*incorrect parsing of title everytime
+*tidy up output
+*create debugging output to log file
+*save photos into folders by date, then access these folders to set the correct images
+*Add Windows support, then Mac
+*create gui
