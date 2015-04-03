@@ -1,5 +1,4 @@
 #!/usr/bin/env python3.4
-# -*- coding: utf-8 -*-
 
 # Created by Cameron Gagnon
 # Version: alpha
@@ -143,7 +142,7 @@ def Login(USERNAME, PASSWORD):
     
     if not Connected("https://www.reddit.com/.json"):
         print("ERROR: You do not appear to be connected to Reddit.com",
-              "this is likely due to redirect by the internet connection",
+              "this is likely due to a redirect by the internet connection",
               "you are on. Check to make sure no login is required, and try",
               "again.")
         sys.exit(0)
@@ -262,9 +261,8 @@ def Insert_to_db(pid, image_name, width, height):
 #EFFECTS  Returns true if 
 def Valid_width_height(submission_title, pid, image_name):
     try:
-        result = re.findall(\
-                r'([0-9,]*)(?:\s*\*\s*|\s*x\s*|\s*\xc3\x97\s*|\s*\xd7\s*)([0-9,]*)',\
-                                                submission_title, re.IGNORECASE)        
+        result = re.findall(r'([0-9,]+)\s*(?:x|\*|×|\xc3\x97|xd7)\s*([0-9,]+)',\
+                            submission_title, re.IGNORECASE | re.UNICODE)        
         if VERBOSE:#####################
             print("Regex from width/height: ")
             print(result, '\n')
