@@ -37,6 +37,8 @@ import sys
 import time
 import urllib.request
 import subprocess
+import logging
+import logging.handlers
 from collections import OrderedDict
 from distutils import spawn
 from socket import timeout
@@ -53,24 +55,54 @@ SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
                                                                 "/reddit/"
 DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
                                                                 "/reddit/"
-MINWIDTH = 1366
-MINHEIGHT = 768
-CYCLETIME = .05 #in minutes
-VERBOSE = False
-DEBUG = False
+### BEGING LOGGING CONFIG
 
-#declared as global in functions so we can
-#decrement MAXPOSTS when we encounter an img
-#that != width/height requirements. This is
-#because in Cycle_wallpaper, it will cycle
-#the list of images from 0 to MAXPOSTS
+# configures logging to external file
+# set file logger
+rootLog = logging.getLogger('')
+rootLog.setLevel(logging.DEBUG)
+
+# set format for output to file
+formatFile = logging.Formatter(fmt='%(asctime)-s %(levelname)-6s: '\
+                                   '%(lineno)d : %(message)s',
+                               datefmt='%m-%d %H:%M')
+
+# add filehandler so once the filesize reaches 5MB a new file is 
+# created, up to 5 files
+fileHandle = logging.handlers.RotatingFileHandler(
+                            "CrashReport.log", maxBytes=5000000, backupCount=3)
+fileHandle.setFormatter(formatFile)
+rootLog.addHandler(fileHandle)
+
+# configures logging to console
+# set console logger
+console = logging.StreamHandler()
+console.setLevel(logging.ERROR)
+
+# set format for console logger
+consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
+console.setFormatter(consoleFormat)
+
+# add handler to root logger so console && file are written to
+logging.getLogger('').addHandler(console)
+c_logger = logging.getLogger('reddit-paper')
+
+### END LOGGING CONFIG
+
+
+# declared as global in functions so we can
+# decrement MAXPOSTS when we encounter an img
+# that != width/height requirements. This is
+# because in Cycle_wallpaper, it will cycle
+# the list of images from 0 to MAXPOSTS
 MAXPOSTS = 5
 image_list = []
 sql = sqlite3.connect('wallpaper.db')
 cur = sql.cursor()
 
-#make sure to have a file in the same directory with your username
-#on the first line, and password on the second
+# make sure to have a file in the same directory with your username
+# on the first line, and password on the second
+### THIS IS PRETTY MUCH MAIN
 def Get_wallpaper():
     global cur
     global sql
@@ -83,24 +115,26 @@ def Get_wallpaper():
         USERNAME = infile.readline().rstrip('\n')
         PASSWORD = infile.readline().rstrip('\n')
     
-    print("\nAccessing database for submission ID's")
+    c_logger.info("Accessing database for submission ID's")
     cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                           Name TEXT, Width INT, Height INT)')
     sql.commit()
     
     r = Login(USERNAME, PASSWORD)
 
-    print("Fetching subreddits from " + SUBREDDITS)
+    c_logger.info("Fetching subreddits from %s", SUBREDDITS)
     subreddit = r.get_subreddit(SUBREDDITS)
     
-    print("Pulling top " + str(MAXPOSTS) + " posts\n")
+    c_logger.info("Pulling top %s posts", MAXPOSTS)
     Get_data_from_pic(subreddit)
     
     Cycle_wallpaper()
     
     sql.close()
+    c_logger.debug("################################################"
+                   "################################################\n")
 
-#METHOD IMPLEMENTATIONS
+### METHOD IMPLEMENTATIONS
 ####################################################################
 #REQUIRES url
 #MODIFIES nothing
@@ -120,17 +154,6 @@ def Connected(url):
     except (AttributeError, ValueError):
         return False
 
-#REQUIRES statement to ouput
-#MODIFIES stdout
-#EFFECTS  prints the output statement if verbose/ is chosen at runtime
-#
-#def log(*args):
-#   if VERBOSE:
-#        for arg in args:
-#            print(args)
-#    elif DEBUG:
-#        pprint.pprint(vars(*args));
-
 ####################################################################
 #REQUIRES USERNAME, PASSWORD
 #MODIFIES connection to reddit
@@ -138,10 +161,10 @@ def Connected(url):
 #         and password.
 def Login(USERNAME, PASSWORD):
     
-    print("Logging in as " + USERNAME + "...")
+    c_logger.info("Logging in as %s ...", USERNAME)
     
     if not Connected("https://www.reddit.com/.json"):
-        print("ERROR: You do not appear to be connected to Reddit.com",
+        c_logger.error("You do not appear to be connected to Reddit.com",
               "this is likely due to a redirect by the internet connection",
               "you are on. Check to make sure no login is required, and try",
               "again.")
@@ -163,28 +186,27 @@ def Title_from_url(url, pid):
         #title
         regex_result = re.findall(r'^(?:https?:\/\/)?(?:www\.)?([^\/]+)',\
                                                     url, re.IGNORECASE)
-        if VERBOSE:######################################
-            print("Regex (domain) from URL is: ",
-                  regex_result, '\n')
+        c_logger.debug("Regex (domain) from URL is: %s ", regex_result)
+        
         if regex_result[0] == "i.imgur.com" or \
            regex_result[0] == "imgur.com":
     
             remove = url.rindex('/')                        
             image_name =  url[-(len(url) - remove - 1):]
+            
             #makes the url have the same domain instead of
             #just imgur.com
-       
             if image_name.rfind(".") == -1:
+                
                 image_name += ".jpg"
                 url = "http://i.imgur.com/" + image_name
-                if VERBOSE:######################
-                    print("Image_name is: " + 
-                             image_name + '\n')
+                
+                c_logger.debug("Image_name is: %s ", image_name)
+                
                 return image_name, url
             else:
-                if VERBOSE:#######################
-                    print("Image_name is: " +
-                         image_name + '\n')
+                c_logger.debug("Image_name is: %s ", image_name)
+                
                 return image_name, url
 
         elif (regex_result[0].find("staticflickr") != -1):
@@ -195,21 +217,19 @@ def Title_from_url(url, pid):
 
         elif (regex_result[0].find("flickr") != -1):
             # have not handled non-staticflickr downloads yet
-            print("Flickr support has not yet been added.\n")
+            c_logger.info("Flickr support has not yet been added.")
             return False, False
 
  
         else:
             remove = url.rindex('/')
             image_name =  url[-(len(url) - remove - 1):]
-            if VERBOSE:###############################
-                print("Image_name is: " + image_name + 
-                         '\n')
+            c_logger.info("Image_name is: %s", image_name)
                 
             return pid, url
     
     except ValueError:
-        print("Error in finding title from URL")
+        c_logger.exception("Error in finding title from URL", exc_info=True)
         return False, False
 
 ####################################################################
@@ -223,16 +243,17 @@ def Already_downloaded(pid, image_name):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
     result = cur.fetchone()
 
-    if VERBOSE:#######################
-        print("Result of Already_downloaded is: ", result, '\n')
+    c_logger.debug("Result of Already_downloaded is: %s", result)
+    
     if result and not Check_width_height(pid):
         return True
+    
     elif result: # need to add check here that file is actually downloaded
                  # instead of basing it on past min-width/min-height requirements
                  # as those might have changed when running program again
-        print("Picture: " + image_name + " is already "
-              "downloaded, will not download again unless "
-              "forced to.\n")
+        c_logger.info("Picture: %s is already downloaded, will not "
+                      "download again unless "
+                      "forced to.", image_name)
         return True
     else:
         return False            
@@ -246,9 +267,8 @@ def Insert_to_db(pid, image_name, width, height):
     global cur
     global sql
     
-    print("Data to insert\nPid: ", str(pid),
-        "\nimage_name: ", image_name, "\nwidth: ",
-        str(width), "\nheight: ", str(height), '\n') 
+    c_logger.info("Data to insert\nPid: %s \nimage_name: %s \nwidth: %s ",
+          "\nheight: %s", pid, image_name, width, height) 
     
     cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?)',\
                 [pid, image_name, width, height])
@@ -263,17 +283,16 @@ def Valid_width_height(submission_title, pid, image_name):
     try:
         result = re.findall(r'([0-9,]+)\s*(?:x|\*|×|\xc3\x97|xd7)\s*([0-9,]+)',\
                             submission_title, re.IGNORECASE | re.UNICODE)        
-        if VERBOSE:#####################
-            print("Regex from width/height: ")
-            print(result, '\n')
+        c_logger.debug("Regex from width/height: %s", result)
+        #print(result, '\n')
 
         result1 = result[0][0]
         result2 = result[0][1]
         result1 = re.sub("[^\d\.]", "", result1)
         result2 = re.sub("[^\d\.]", "", result2)
         
-        if VERBOSE:
-            print("Width: ", result1, "\nHeight: ", result2)
+        c_logger.debug("Width: %s \nHeight: %s", result1, result2)
+        
         Insert_to_db(pid, image_name, result1, result2)         
         return Lookup_width_height(pid, image_name)
 
@@ -290,8 +309,7 @@ def Check_width_height(pid):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
     lookup = cur.fetchone()
     
-    if VERBOSE:#############
-        print("Lookup from Check_width_height: ", lookup, '\n')
+    c_logger.debug("Lookup from Check_width_height: %s", lookup)
     
     width = lookup[2]
     height = lookup[3]
@@ -303,8 +321,8 @@ def Check_width_height(pid):
         else:
             return False
     except ValueError:
-        print("Incorrect type comparison for width and height"
-              " most likely an incorrect parsing of title.\n")
+        c_logger.exception("Incorrect type comparison for width and height"
+              " most likely an incorrect parsing of title.", exc_info=True)
 
 ####################################################################
 #REQUIRES width, height and ID of the image
@@ -313,11 +331,13 @@ def Check_width_height(pid):
 #         height requirements set by the user.
 def Lookup_width_height(pid, image_name):
     if  Check_width_height(pid):
-        print("Image: " + image_name + " fits required size.")
+        c_logger.info("Image: %s fits required size.", image_name)
         return True
     else:
-        print("Image: " + image_name + " does not fit"
-              " required size. Will not download.\n")
+        c_logger.info("Image: %s does not fit required size."
+                      "Will not download.\n", image_name)
+        return False
+
 ####################################################################
 #REQUIRES url
 #MODIFIES image_name, local_save, picdl
@@ -328,21 +348,18 @@ def Set_up_url(url, image_name):
     #it appears this next line does not affect the return value
     #although it may announce the request to the server, giving 
     #them more details about the request
-    picdl = urllib.request.Request(url, \
-            headers = { 'User-Agent': USERAGENT})
+    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
     
     local_save = DOWNLOADLOCATION + image_name
     
     #returns a tuple that is assigned correctly after
     #this function returns
-    if VERBOSE:#########################################
-        print("URL is: " + url + '\n')
+    c_logger.debug("URL is: %s", url)
     try:
         picdl = urllib.request.urlopen(picdl)
         return local_save, picdl
     except urllib.error.HTTPError as err:
-        print("ERROR occured in Set_up_url!!!!\n")
-        print(err)
+        c_logger.exception("ERROR: occured in Set_up_url!!!!\n", exc_info=True)
 ####################################################################
 #REQUIRES url, image_name, local_save, cur, sql
 #MODIFIES file on hard drive, image_list
@@ -351,8 +368,8 @@ def Set_up_url(url, image_name):
 def Img_download(url, image_name, local_save, picdl, pid):
     global image_list
     
-    print ("downloading: " + url + "\nas: " + \
-            image_name + "\nto: " + local_save)
+    c_logger.info("downloading: %s \nas: %s \nto: %s", 
+                  url, image_name, local_save)
     
     with open(DOWNLOADLOCATION + image_name, "wb") as picfile:
         picfile.write(picdl.read())
@@ -371,12 +388,11 @@ def Get_data_from_pic(subreddit):
     global sql
         
     for post in subreddit.get_hot(limit = MAXPOSTS):
-        if DEBUG:
-#pprint.pprint(vars(post))
-            print("Title of post: ", post.title, 
-                  "   \nId of post: ", post.id, 
-                  "  \nUrl of post: " , post.url
-                  , "\n")
+
+        c_logger.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
+                       "\n\t\t\t\t\t\t  URL of post: %s",
+                       post.id, post.title, post.url)
+
         pid = post.id
         url = post.url
         submission_title = post.title
@@ -421,17 +437,15 @@ def Set_wallpaper(image_name):
     try:                            
         subprocess.call(args = SETWALLPAPER + image_name, 
                             shell=True)
-        if VERBOSE:
-            print("Wallpaper should be set to: {name}"
-                  " Cycle time: {cycletime:>d} seconds".format(
-                  name = image_name,
-                  cycletime = int(CYCLETIME*60)))
+        c_logger.debug("Wallpaper should be set to: %s"
+                           " Cycle time: %d seconds",
+                           image_name, (CYCLETIME*60))
                             
     except:
-        print("Error setting wallpaper, it is likely the "
+        c_logger.exception("Error setting wallpaper, it is likely the "
               "file path is not 100% correct. Make sure "
               "there is a foward slash at the end of the "
-              "path in the SETWALLPAPER variable.")
+              "path in the SETWALLPAPER variable.", exc_info=True)
         sys.exit(1)
 
 ###################################################################
@@ -442,10 +456,7 @@ def Set_wallpaper(image_name):
 def Cycle_wallpaper():
     global image_list
     
-    if VERBOSE:
-        print("\nMAXPOSTS is: ", MAXPOSTS, '\n')
-    
-    print(MAXPOSTS, "images to rotate")
+    c_logger.debug("MAXPOSTS is: %s", MAXPOSTS)
     
     for i in range(0, MAXPOSTS, 1):
         Set_wallpaper(image_list[i])
@@ -458,17 +469,13 @@ def Cycle_wallpaper():
 #EFFECTS  Sets variables to modify output of program and change 
 #         default options to user specified ones.
 def Parse_cmd_args():
-    global VERBOSE
     global MINWIDTH
     global MINHEIGHT
     global CYCLETIME
-    global DEBUG
     global MAXPOSTS
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Verbose output of program")
     parser.add_argument("-mw", "--minwidth", type = int,
                         help="Minimum width of picture required "
                              "to download", default = 1024)
@@ -481,24 +488,12 @@ def Parse_cmd_args():
     parser.add_argument("-t", "--cycletime", type = float,
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper", default = .05)
-    parser.add_argument("-d", "--debug", action = "store_true", 
-                        help = "Aids in debugging of program")
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
     MINHEIGHT = int(args.minheight)
     MAXPOSTS = int(args.maxposts)
     CYCLETIME = float(args.cycletime)
-    
-    if args.debug:
-        VERBOSE = True
-        DEBUG = True
-    elif args.verbose:
-        VERBOSE = True
-        DEBUG = False
-    else:
-        DEBUG = False
-        VERBOSE = False
     
 ###################################################################
 if __name__ == '__main__':
