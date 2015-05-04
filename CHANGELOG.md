@@ -10,3 +10,6 @@
 
 4/3/2015
 * fixed regex for title to not match any 'x' in title and just the 'width x height'
+
+5/4/2015
+* added logging to external file, removed print statements
