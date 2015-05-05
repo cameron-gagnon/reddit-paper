@@ -39,6 +39,7 @@ import urllib.request
 import subprocess
 import logging
 import logging.handlers
+from bs4 import BeautifulSoup
 from collections import OrderedDict
 from distutils import spawn
 from socket import timeout
@@ -55,38 +56,33 @@ SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
                                                                 "/reddit/"
 DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
                                                                 "/reddit/"
-### BEGING LOGGING CONFIG
 
+
+### BEGIN LOGGING CONFIG
 # configures logging to external file
 # set file logger
 rootLog = logging.getLogger('')
 rootLog.setLevel(logging.DEBUG)
-
 # set format for output to file
 formatFile = logging.Formatter(fmt='%(asctime)-s %(levelname)-6s: '\
                                    '%(lineno)d : %(message)s',
                                datefmt='%m-%d %H:%M')
-
 # add filehandler so once the filesize reaches 5MB a new file is 
 # created, up to 5 files
 fileHandle = logging.handlers.RotatingFileHandler(
                             "CrashReport.log", maxBytes=5000000, backupCount=3)
 fileHandle.setFormatter(formatFile)
 rootLog.addHandler(fileHandle)
-
 # configures logging to console
 # set console logger
 console = logging.StreamHandler()
-console.setLevel(logging.ERROR)
-
+console.setLevel(logging.DEBUG)
 # set format for console logger
 consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
-
 # add handler to root logger so console && file are written to
 logging.getLogger('').addHandler(console)
 c_logger = logging.getLogger('reddit-paper')
-
 ### END LOGGING CONFIG
 
 
@@ -102,37 +98,39 @@ cur = sql.cursor()
 
 # make sure to have a file in the same directory with your username
 # on the first line, and password on the second
-### THIS IS PRETTY MUCH MAIN
-def Get_wallpaper():
+def main():
     global cur
     global sql
+    try:
+        Parse_cmd_args()
     
-    Parse_cmd_args()
+        with open(CREDENTIALS, 'r') as infile: 
+            #removes the newline character at end of
+            #each line so login will work
+            USERNAME = infile.readline().rstrip('\n')
+            PASSWORD = infile.readline().rstrip('\n')
+        
+        c_logger.info("Accessing database for submission ID's")
+        cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
+                              Name TEXT, Width INT, Height INT)')
+        sql.commit()
+        
+        r = Login(USERNAME, PASSWORD)
     
-    with open(CREDENTIALS, 'r') as infile:
-        #removes the newline character at end of
-        #each line so login will work
-        USERNAME = infile.readline().rstrip('\n')
-        PASSWORD = infile.readline().rstrip('\n')
-    
-    c_logger.info("Accessing database for submission ID's")
-    cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
-                          Name TEXT, Width INT, Height INT)')
-    sql.commit()
-    
-    r = Login(USERNAME, PASSWORD)
-
-    c_logger.info("Fetching subreddits from %s", SUBREDDITS)
-    subreddit = r.get_subreddit(SUBREDDITS)
-    
-    c_logger.info("Pulling top %s posts", MAXPOSTS)
-    Get_data_from_pic(subreddit)
-    
-    Cycle_wallpaper()
-    
-    sql.close()
-    c_logger.debug("################################################"
-                   "################################################\n")
+        c_logger.info("Fetching subreddits from %s", SUBREDDITS)
+        subreddit = r.get_subreddit(SUBREDDITS)
+        
+        c_logger.info("Pulling top %s posts", MAXPOSTS)
+        Get_data_from_pic(subreddit)
+        
+        Cycle_wallpaper()
+        
+        sql.close()
+        c_logger.debug("################################################"
+                       "################################################\n")
+    except KeyboardInterrupt:
+        c_logger.info("CTRL + C entered from command line, exiting...")
+        sys.exit(0)
 
 ### METHOD IMPLEMENTATIONS
 ####################################################################
@@ -267,8 +265,11 @@ def Insert_to_db(pid, image_name, width, height):
     global cur
     global sql
     
-    c_logger.info("Data to insert\nPid: %s \nimage_name: %s \nwidth: %s ",
-          "\nheight: %s", pid, image_name, width, height) 
+    c_logger.info("Data to insert\n\t\t\t\t\t\t  Pid: %s"\
+                  "\n\t\t\t\t\t\t  image_name: %s"\
+                  "\n\t\t\t\t\t\t  width: %s"\
+                  "\n\t\t\t\t\t\t  height: %s",
+                  pid, image_name, width, height) 
     
     cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?)',\
                 [pid, image_name, width, height])
@@ -291,13 +292,13 @@ def Valid_width_height(submission_title, pid, image_name):
         result1 = re.sub("[^\d\.]", "", result1)
         result2 = re.sub("[^\d\.]", "", result2)
         
-        c_logger.debug("Width: %s \nHeight: %s", result1, result2)
+        c_logger.debug("Width: %s \n\t\t\t\t\t\t  Height: %s", result1, result2)
         
         Insert_to_db(pid, image_name, result1, result2)         
         return Lookup_width_height(pid, image_name)
 
     except IndexError:
-        print("The title of the submission does not appear"
+        c_logger.debug("The title of the submission does not appear"
               " to be formatted correctly. Skipping"
               " submission and trying the next one.")
 ####################################################################
@@ -334,8 +335,8 @@ def Lookup_width_height(pid, image_name):
         c_logger.info("Image: %s fits required size.", image_name)
         return True
     else:
-        c_logger.info("Image: %s does not fit required size."
-                      "Will not download.\n", image_name)
+        c_logger.info("Image: %s does not fit required size. "
+                      "Will not download.", image_name)
         return False
 
 ####################################################################
@@ -368,13 +369,13 @@ def Set_up_url(url, image_name):
 def Img_download(url, image_name, local_save, picdl, pid):
     global image_list
     
-    c_logger.info("downloading: %s \nas: %s \nto: %s", 
+    c_logger.info("downloading: %s \n\t\t\t\t\t\t  as: %s "\
+                  "\n\t\t\t\t\t\t  to: %s",
                   url, image_name, local_save)
     
     with open(DOWNLOADLOCATION + image_name, "wb") as picfile:
         picfile.write(picdl.read())
         image_list.append(image_name)
-        print('\n')
     
 ####################################################################
 #REQUIRES url 
@@ -391,7 +392,7 @@ def Get_data_from_pic(subreddit):
 
         c_logger.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                        "\n\t\t\t\t\t\t  URL of post: %s",
-                       post.id, post.title, post.url)
+                       post.title, post.id, post.url)
 
         pid = post.id
         url = post.url
@@ -497,4 +498,4 @@ def Parse_cmd_args():
     
 ###################################################################
 if __name__ == '__main__':
-    Get_wallpaper()
+    main()
