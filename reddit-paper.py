@@ -76,7 +76,7 @@ rootLog.addHandler(fileHandle)
 # configures logging to console
 # set console logger
 console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
+console.setLevel(logging.ERROR) #toggle console level output with this line
 # set format for console logger
 consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
@@ -376,7 +376,7 @@ def Img_download(url, image_name, local_save, picdl, pid):
     with open(DOWNLOADLOCATION + image_name, "wb") as picfile:
         picfile.write(picdl.read())
         image_list.append(image_name)
-    
+
 ####################################################################
 #REQUIRES url 
 #MODIFIES download location, adds new picture to file
@@ -427,6 +427,8 @@ def Get_data_from_pic(subreddit):
                 #statement takes place.
                 
                 image_list.append(image_name)
+    
+    c_logger.debug("Exiting Get_data_from_pic fn")
 
 ####################################################################
 #REQUIRES setpaper is the command particular to each 
@@ -437,11 +439,13 @@ def Get_data_from_pic(subreddit):
 def Set_wallpaper(image_name):
     try:                            
         subprocess.call(args = SETWALLPAPER + image_name, 
-                            shell=True)
+                        shell = True)
         c_logger.debug("Wallpaper should be set to: %s"
                            " Cycle time: %d seconds",
                            image_name, (CYCLETIME*60))
                             
+    except KeyboardInterrupt:
+            sys.exit(0)
     except:
         c_logger.exception("Error setting wallpaper, it is likely the "
               "file path is not 100% correct. Make sure "
@@ -462,7 +466,6 @@ def Cycle_wallpaper():
     for i in range(0, MAXPOSTS, 1):
         Set_wallpaper(image_list[i])
         time.sleep(CYCLETIME*60)
-    print('')
 
 ###################################################################
 #REQUIRES command line args
