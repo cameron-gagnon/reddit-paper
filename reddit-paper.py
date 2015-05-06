@@ -76,7 +76,7 @@ rootLog.addHandler(fileHandle)
 # configures logging to console
 # set console logger
 console = logging.StreamHandler()
-console.setLevel(logging.DEBUG) #toggle console level output with this line
+console.setLevel(logging.ERROR) #toggle console level output with this line
 # set format for console logger
 consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
@@ -183,18 +183,18 @@ def Login(USERNAME, PASSWORD):
 # _o (original file) is used here as it is most reliable,
 # although likely sometimes very large
 # https://www.flickr.com/services/api/misc.urls.html
-def Flickr_parse(url, pid):
+def Flickr_parse(url):
     try:
         #gets the page and reads the hmtl into flickr_html
         flickr_html = urllib.request.urlopen(url).read()
         #searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
         img_link = re.findall(r"""
-                                farm      #farm is always in static img url
-                                [^"\\:]*  #characters not to capture
-                                _[o|k|h|b]\.      #_o indicates original img per flickr standards
-                                [jpg|png|gif]* #file format is either png, jpg, or gif
-                                """, flickr_html, re.VERBOSE)[0]    
+                              farm      #farm is always in static img url
+                              [^"\\:]*  #characters not to capture
+                              _[o|k|h|b]\.  #_o indicates original img per flickr standards
+                              [jpg|png|gif]* #file format is either png, jpg, or gif
+                              """, flickr_html, re.VERBOSE)[0]    
         url = 'https://' + img_link
 
         c_logger.debug("img_link from flickr regex: %s", img_link)
@@ -213,6 +213,36 @@ def Flickr_parse(url, pid):
                          exc_info = True)
         return False, False
 
+####################################################################
+#REQUIRES url
+#MODIFIES url, image_name
+#EFFECTS  Returns the image_name and url of the correct link to
+#         download from. 500px.com sometimes 'protects' the photos
+#         so they are not as easily programatically downloaded,
+#         however the links in the html provide the 'static' download
+#         link
+def Five00px_parse(url):
+    try:
+        #refer to Flickr_parse for explanation of this method
+        px_html = urllib.request.urlopen(url).read()
+        px_html = px_html.decode('utf-8')
+    
+        img_link = re.findall(r'https://drscdn.500px.org/photo[^"][\w/%]*', px_html)[0]
+        url = img_link
+    
+        if img_link == []:
+            return False, False
+    
+        remove_index = img_link.rindex('/')
+        image_name = img_link[-(len(img_link) - remove_index - 1):]
+    
+        return image_name, url
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception:
+        c_logger.warning("Exception occured in Five00px_parse", 
+                         exc_info = True)
+        return False, False
 
 ####################################################################
 #REQUIRES url of image to be renamed 
@@ -257,10 +287,12 @@ def Title_from_url(url, pid):
 
         elif (regex_result[0].find("flickr") != -1):
             
-            c_logger.info("Flickr support has not yet been added.")
             # returns image_name, url
-            return Flickr_parse(url, pid)
+            return Flickr_parse(url)
  
+        elif (regex_result[0].find("500px.com") != -1):
+
+            return Five00px_parse(url)
         else:
             remove = url.rindex('/')
             
@@ -430,9 +462,10 @@ def Get_data_from_pic(subreddit):
     global MAXPOSTS
     global cur
     global sql
-        
+    
+    i = 1        
     for post in subreddit.get_hot(limit = MAXPOSTS):
-        i = 1
+        
         c_logger.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         c_logger.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                        "\n\t\t\t\t\t\t  URL of post: %s",
