@@ -47,7 +47,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "earthporn+waterporn+spaceporn"
+SUBREDDITS = "spaceporn"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -76,7 +76,7 @@ rootLog.addHandler(fileHandle)
 # configures logging to console
 # set console logger
 console = logging.StreamHandler()
-console.setLevel(logging.ERROR) #toggle console level output with this line
+console.setLevel(logging.DEBUG) #toggle console level output with this line
 # set format for console logger
 consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
@@ -173,9 +173,51 @@ def Login(USERNAME, PASSWORD):
     return r
 
 ####################################################################
+#REQUIRES url
+#MODIFIES url
+#EFFECTS  Returns the static download URL of the file, specific
+#         to Flickr. This S.O. post helped:
+# https://stackoverflow.com/questions/21673323/download-flickr-images-of-specific-url
+#
+# This is a list of titles and how to determine size based on ending characters -
+# _o (original file) is used here as it is most reliable,
+# although likely sometimes very large
+# https://www.flickr.com/services/api/misc.urls.html
+def Flickr_parse(url, pid):
+    try:
+        #gets the page and reads the hmtl into flickr_html
+        flickr_html = urllib.request.urlopen(url).read()
+        #searches for static flickr url within webpage
+        flickr_html = flickr_html.decode('utf-8')
+        img_link = re.findall(r"""
+                                farm      #farm is always in static img url
+                                [^"\\:]*  #characters not to capture
+                                _[o|k|h|b]\.      #_o indicates original img per flickr standards
+                                [jpg|png|gif]* #file format is either png, jpg, or gif
+                                """, flickr_html, re.VERBOSE)[0]    
+        url = 'https://' + img_link
+
+        c_logger.debug("img_link from flickr regex: %s", img_link)
+        #generates image_name from static url
+        if img_link == []:
+            return False, False
+        
+        remove_index = img_link.rindex('/')                        
+        image_name =  img_link[-(len(img_link) - remove_index - 1):]
+        
+        return image_name, url
+    except KeyboardInterrupt:
+        sys.exit(0)
+    except Exception:
+        c_logger.warning("Exception occured in Flickr_parse",
+                         exc_info = True)
+        return False, False
+
+
+####################################################################
 #REQUIRES url of image to be renamed 
 #MODIFIES nothing
-#EFFECTS  Outputs the image title of the photo being downloaded
+#EFFECTS  Outputs the image title and URL of the photo being downloaded
 #         instead of the long URL it comes in as
 def Title_from_url(url, pid):
     try:
@@ -214,17 +256,21 @@ def Title_from_url(url, pid):
             return image_name, url
 
         elif (regex_result[0].find("flickr") != -1):
-            # have not handled non-staticflickr downloads yet
+            
             c_logger.info("Flickr support has not yet been added.")
-            return False, False
-
+            # returns image_name, url
+            return Flickr_parse(url, pid)
  
         else:
             remove = url.rindex('/')
-            image_name =  url[-(len(url) - remove - 1):]
-            c_logger.info("Image_name is: %s", image_name)
+            
+            if remove == -1:
+                image_name = pid + '.jpg'
+            else:    
+                image_name =  url[-(len(url) - remove - 1):]
+                c_logger.info("Image_name is: %s", image_name)
                 
-            return pid, url
+            return image_name, url
     
     except ValueError:
         c_logger.exception("Error in finding title from URL", exc_info=True)
@@ -346,9 +392,6 @@ def Lookup_width_height(pid, image_name):
 #         Passes out the full download location. Opens the file from
 #         the specified url.
 def Set_up_url(url, image_name):
-    #it appears this next line does not affect the return value
-    #although it may announce the request to the server, giving 
-    #them more details about the request
     picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
     
     local_save = DOWNLOADLOCATION + image_name
@@ -389,7 +432,8 @@ def Get_data_from_pic(subreddit):
     global sql
         
     for post in subreddit.get_hot(limit = MAXPOSTS):
-
+        i = 1
+        c_logger.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         c_logger.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                        "\n\t\t\t\t\t\t  URL of post: %s",
                        post.title, post.id, post.url)
@@ -427,7 +471,7 @@ def Get_data_from_pic(subreddit):
                 #statement takes place.
                 
                 image_list.append(image_name)
-    
+        i += 1
     c_logger.debug("Exiting Get_data_from_pic fn")
 
 ####################################################################
