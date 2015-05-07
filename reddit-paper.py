@@ -47,7 +47,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "earthporn+spaceporn+imaginarystarscapes"
+SUBREDDITS = "lavaporn"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -216,6 +216,12 @@ def Flickr_parse(url):
         return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
+    
+    # this (UnicodeDecodeError) is thrown when the file link is 
+    # given to read, and cannot be decoded to "utf-8" therefore,
+    # we just need to download the img normally anyway
+    except UnicodeDecodeError:
+        return General_parser(url), url
     except Exception:
         log.warning("Exception occured in Flickr_parse",
                          exc_info = True)
@@ -241,6 +247,8 @@ def Five00px_parse(url):
         return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
+    except UnicodeDecodeError:
+        return General_parser(url), url
     except Exception:
         log.warning("Exception occured in Five00px_parse", 
                          exc_info = True)
