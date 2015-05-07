@@ -47,7 +47,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "earthporn"
+SUBREDDITS = "earthporn+spaceporn+imaginarystarscapes"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -82,7 +82,7 @@ consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
 # add handler to root logger so console && file are written to
 logging.getLogger('').addHandler(console)
-c_logger = logging.getLogger('reddit-paper')
+log = logging.getLogger('reddit-paper')
 ### END LOGGING CONFIG
 
 
@@ -110,26 +110,26 @@ def main():
             USERNAME = infile.readline().rstrip('\n')
             PASSWORD = infile.readline().rstrip('\n')
         
-        c_logger.info("Accessing database for submission ID's")
+        log.info("Accessing database for submission ID's")
         cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                               Name TEXT, Width INT, Height INT)')
         sql.commit()
         
         r = Login(USERNAME, PASSWORD)
     
-        c_logger.info("Fetching subreddits from %s", SUBREDDITS)
+        log.info("Fetching subreddits from %s", SUBREDDITS)
         subreddit = r.get_subreddit(SUBREDDITS)
         
-        c_logger.info("Pulling top %s posts", MAXPOSTS)
+        log.info("Pulling top %s posts", MAXPOSTS)
         Get_data_from_pic(subreddit)
         
         Cycle_wallpaper()
         
         sql.close()
-        c_logger.debug("################################################"
+        log.debug("################################################"
                        "################################################\n")
     except KeyboardInterrupt:
-        c_logger.info("CTRL + C entered from command line, exiting...")
+        log.info("CTRL + C entered from command line, exiting...")
         sys.exit(0)
 
 ### METHOD IMPLEMENTATIONS
@@ -149,28 +149,41 @@ def Connected(url):
         json.loads(content)
         url.close()
         return True
-    except (AttributeError, ValueError):
+    except (HTTPError, URLError, timeout, AttributeError, ValueError):
+        log.error("You do not appear to be connected to Reddit.com."
+                       " Tthis is likely due to a redirect by the internet connection"
+                       " you are on. Check to make sure no login is required and the"
+                       " connection is stable, and then try again.")
         return False
 
 ####################################################################
-#REQUIRES USERNAME, PASSWORD
+#REQUIRES valid USERNAME, PASSWORD
 #MODIFIES connection to reddit
 #EFFECTS  Attempts to login to Reddit using the provided username
 #         and password.
 def Login(USERNAME, PASSWORD):
     
-    c_logger.info("Logging in as %s ...", USERNAME)
+    log.info("Logging in as %s ...", USERNAME)
     
     if not Connected("https://www.reddit.com/.json"):
-        c_logger.error("You do not appear to be connected to Reddit.com",
-              "this is likely due to a redirect by the internet connection",
-              "you are on. Check to make sure no login is required, and try",
-              "again.")
         sys.exit(0)
 
     r = praw.Reddit(user_agent = USERAGENT)
     r.login(USERNAME, PASSWORD)
     return r
+
+####################################################################
+#REQUIRES img_link
+#MODIFIES img_link
+#EFFECTS  Performs operations on url to derive image name and then
+#         returns the img_name
+def General_parser(img_link):
+    if img_link == []:
+        return False
+        
+    remove_index = img_link.rindex('/')                        
+    image_name =  img_link[-(len(img_link) - remove_index - 1):]
+    return image_name
 
 ####################################################################
 #REQUIRES url
@@ -197,19 +210,14 @@ def Flickr_parse(url):
                               """, flickr_html, re.VERBOSE)[0]    
         url = 'https://' + img_link
 
-        c_logger.debug("img_link from flickr regex: %s", img_link)
+        log.debug("img_link from flickr regex: %s", img_link)
         #generates image_name from static url
-        if img_link == []:
-            return False, False
         
-        remove_index = img_link.rindex('/')                        
-        image_name =  img_link[-(len(img_link) - remove_index - 1):]
-        
-        return image_name, url
+        return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
     except Exception:
-        c_logger.warning("Exception occured in Flickr_parse",
+        log.warning("Exception occured in Flickr_parse",
                          exc_info = True)
         return False, False
 
@@ -229,21 +237,40 @@ def Five00px_parse(url):
     
         img_link = re.findall(r'https://drscdn.500px.org/photo[^"][\w/%]*', px_html)[0]
         url = img_link
-    
-        if img_link == []:
-            return False, False
-    
-        remove_index = img_link.rindex('/')
-        image_name = img_link[-(len(img_link) - remove_index - 1):]
-    
-        return image_name, url
+            
+        return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
     except Exception:
-        c_logger.warning("Exception occured in Five00px_parse", 
+        log.warning("Exception occured in Five00px_parse", 
                          exc_info = True)
         return False, False
-
+####################################################################
+# Very similar to Five00px_parse and Flickr_parse, look through there
+# for details of workings on this method
+def Deviant_parse(url):
+    try:
+        dev_html = urllib.request.urlopen(url).read()
+        dev_html = dev_html.decode('utf-8')
+    
+        img_link = re.findall(r'src="[\w=":;,%_ /.\n-]* class="dev-content-normal"',
+                              dev_html)[0]
+        link = re.findall(r'http://[\w./%-]*', img_link)[0]
+        url = link
+        
+        return General_parser(link), url
+    except KeyboardInterrupt:
+        sys.exit(0)
+    # this exception is when the good img url to download is
+    # passed in. Since this url when opened is not html, it throws
+    # this error, so we know we must find the image title and return
+    # the url passed in
+    except UnicodeDecodeError:
+        return General_parser(url), url
+    except Exception:
+        log.warning("Exception occured in Deviant_parse",
+                         exc_info = True)
+        return False, False
 ####################################################################
 #REQUIRES url of image to be renamed 
 #MODIFIES nothing
@@ -256,7 +283,7 @@ def Title_from_url(url, pid):
         #title
         regex_result = re.findall(r'^(?:https?:\/\/)?(?:www\.)?([^\/]+)',\
                                                     url, re.IGNORECASE)
-        c_logger.debug("Regex (domain) from URL is: %s ", regex_result)
+        log.debug("Regex (domain) from URL is: %s ", regex_result)
         
         if regex_result[0] == "i.imgur.com" or \
            regex_result[0] == "imgur.com":
@@ -271,28 +298,43 @@ def Title_from_url(url, pid):
                 image_name += ".jpg"
                 url = "http://i.imgur.com/" + image_name
                 
-                c_logger.debug("Image_name is: %s ", image_name)
+                log.debug("Image_name is: %s ", image_name)
                 
-                return image_name, url
+                return image_name, url, True
             else:
-                c_logger.debug("Image_name is: %s ", image_name)
+                log.debug("Image_name is: %s ", image_name)
                 
-                return image_name, url
+                return image_name, url, True
 
         elif (regex_result[0].find("staticflickr") != -1):
             remove = url.rindex('/')                        
             image_name =  url[-(len(url) - remove - 1):]
             
-            return image_name, url
+            return image_name, url, True
 
         elif (regex_result[0].find("flickr") != -1):
             
-            # returns image_name, url
-            return Flickr_parse(url)
- 
-        elif (regex_result[0].find("500px.com") != -1):
+            image_name, url = Flickr_parse(url)
+            
+            return image_name, url, True
 
-            return Five00px_parse(url)
+        elif (regex_result[0].find("500px.com") != -1):
+            
+            image_name, url = Five00px_parse(url)
+
+            return image_name, url, True
+        
+        elif (regex_result[0].find("deviantart") != -1):
+            
+            image_name, url = Deviant_parse(url)
+            
+            return image_name, url, True
+        
+        elif (url.find(".jpg") != -1) or (url.find(".png") != -1)\
+             or (url.find(".gif") != -1):
+            
+            return General_parser(url), url, True
+
         else:
             remove = url.rindex('/')
             
@@ -300,13 +342,13 @@ def Title_from_url(url, pid):
                 image_name = pid + '.jpg'
             else:    
                 image_name =  url[-(len(url) - remove - 1):]
-                c_logger.info("Image_name is: %s", image_name)
+                log.info("Image_name is: %s", image_name)
                 
-            return image_name, url
+            return image_name, url, False
     
     except ValueError:
-        c_logger.exception("Error in finding title from URL", exc_info=True)
-        return False, False
+        log.exception("Error in finding title from URL", exc_info=True)
+        return False, False, False
 
 ####################################################################
 #REQUIRES id of submission in question
@@ -319,7 +361,7 @@ def Already_downloaded(pid, image_name):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
     result = cur.fetchone()
 
-    c_logger.debug("Result of Already_downloaded is: %s", result)
+    log.debug("Result of Already_downloaded is: %s", result)
     
     if result and not Check_width_height(pid):
         return True
@@ -327,7 +369,7 @@ def Already_downloaded(pid, image_name):
     elif result: # need to add check here that file is actually downloaded
                  # instead of basing it on past min-width/min-height requirements
                  # as those might have changed when running program again
-        c_logger.info("Picture: %s is already downloaded, will not "
+        log.info("Picture: %s is already downloaded, will not "
                       "download again unless "
                       "forced to.", image_name)
         return True
@@ -343,7 +385,7 @@ def Insert_to_db(pid, image_name, width, height):
     global cur
     global sql
     
-    c_logger.info("Data to insert\n\t\t\t\t\t\t  Pid: %s"\
+    log.info("Data to insert\n\t\t\t\t\t\t  Pid: %s"\
                   "\n\t\t\t\t\t\t  image_name: %s"\
                   "\n\t\t\t\t\t\t  width: %s"\
                   "\n\t\t\t\t\t\t  height: %s",
@@ -362,21 +404,20 @@ def Valid_width_height(submission_title, pid, image_name):
     try:
         result = re.findall(r'([0-9,]+)\s*(?:x|\*|×|\xc3\x97|xd7)\s*([0-9,]+)',\
                             submission_title, re.IGNORECASE | re.UNICODE)        
-        c_logger.debug("Regex from width/height: %s", result)
-        #print(result, '\n')
+        log.debug("Regex from width/height: %s", result)
 
         result1 = result[0][0]
         result2 = result[0][1]
         result1 = re.sub("[^\d\.]", "", result1)
         result2 = re.sub("[^\d\.]", "", result2)
         
-        c_logger.debug("Width: %s \n\t\t\t\t\t\t  Height: %s", result1, result2)
+        log.debug("Width: %s \n\t\t\t\t\t\t  Height: %s", result1, result2)
         
         Insert_to_db(pid, image_name, result1, result2)         
         return Lookup_width_height(pid, image_name)
 
     except IndexError:
-        c_logger.debug("The title of the submission does not appear"
+        log.debug("The title of the submission does not appear"
               " to be formatted correctly. Skipping"
               " submission and trying the next one.")
 ####################################################################
@@ -388,7 +429,7 @@ def Check_width_height(pid):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [pid])
     lookup = cur.fetchone()
     
-    c_logger.debug("Lookup from Check_width_height: %s", lookup)
+    log.debug("Lookup from Check_width_height: %s", lookup)
     
     width = lookup[2]
     height = lookup[3]
@@ -400,7 +441,7 @@ def Check_width_height(pid):
         else:
             return False
     except ValueError:
-        c_logger.exception("Incorrect type comparison for width and height"
+        log.exception("Incorrect type comparison for width and height"
               " most likely an incorrect parsing of title.", exc_info=True)
 
 ####################################################################
@@ -410,48 +451,43 @@ def Check_width_height(pid):
 #         height requirements set by the user.
 def Lookup_width_height(pid, image_name):
     if  Check_width_height(pid):
-        c_logger.info("Image: %s fits required size.", image_name)
+        log.info("Image: %s fits required size.", image_name)
         return True
     else:
-        c_logger.info("Image: %s does not fit required size. "
+        log.info("Image: %s does not fit required size. "
                       "Will not download.", image_name)
         return False
 
-####################################################################
-#REQUIRES url
-#MODIFIES image_name, local_save, picdl
-#EFFECTS  Sets the image_name to the title of the download.
-#         Passes out the full download location. Opens the file from
-#         the specified url.
-def Set_up_url(url, image_name):
-    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
-    
-    local_save = DOWNLOADLOCATION + image_name
-    
-    #returns a tuple that is assigned correctly after
-    #this function returns
-    c_logger.debug("URL is: %s", url)
-    try:
-        picdl = urllib.request.urlopen(picdl)
-        return local_save, picdl
-    except urllib.error.HTTPError as err:
-        c_logger.exception("ERROR: occured in Set_up_url!!!!\n", exc_info=True)
 ####################################################################
 #REQUIRES url, image_name, local_save, cur, sql
 #MODIFIES file on hard drive, image_list
 #EFFECTS  Prints out the download name and location, then saves the
 #         picture to that spot.
-def Img_download(url, image_name, local_save, picdl, pid):
+def Download_img(url, image_name, pid):
     global image_list
     
-    c_logger.info("downloading: %s \n\t\t\t\t\t\t  as: %s "\
+    #gets the pic download information and sets the download location
+    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
+    local_save = DOWNLOADLOCATION + image_name
+    log.debug("URL is: %s", url)
+
+    try:
+        picdl = urllib.request.urlopen(picdl)
+
+    except urllib.error.HTTPError as err:
+        log.exception("ERROR: occured in Setting up the url!!\n",
+                           exc_info=True)
+        return False
+
+    log.info("downloading: %s \n\t\t\t\t\t\t  as: %s "\
                   "\n\t\t\t\t\t\t  to: %s",
                   url, image_name, local_save)
     
     with open(DOWNLOADLOCATION + image_name, "wb") as picfile:
         picfile.write(picdl.read())
         image_list.append(image_name)
-
+    
+    return True
 ####################################################################
 #REQUIRES url 
 #MODIFIES download location, adds new picture to file
@@ -465,26 +501,37 @@ def Get_data_from_pic(subreddit):
     
     i = 1        
     for post in subreddit.get_hot(limit = MAXPOSTS):
-        
-        c_logger.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
-        c_logger.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                       "\n\t\t\t\t\t\t  URL of post: %s",
-                       post.title, post.id, post.url)
-
+ 
         pid = post.id
         url = post.url
         submission_title = post.title
-        image_name, url = Title_from_url(url, pid)
+       
+        log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
+        log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
+                       "\n\t\t\t\t\t\t  URL of post: %s",
+                       submission_title, pid, url)
         
+        image_name, url, is_deviant = Title_from_url(url, pid)
+        
+        log.debug("is_deviant is: %s", is_deviant)
+
         if (not image_name or not url):
             MAXPOSTS -= 1
                         
         else:
             if not Already_downloaded(pid, image_name):
-                if  Valid_width_height(submission_title,\
-                                       pid, image_name):
-                    local_save, picdl = Set_up_url(url, image_name)
-                    Img_download(url, image_name, local_save, picdl, pid)
+                if  Valid_width_height(submission_title,
+                                       pid, image_name) and\
+                    Download_img(url, image_name, pid):
+                    log.debug("Image successfully downloaded with"
+                            "WxH in title")
+
+                elif is_deviant and\
+                     Download_img(url, image_name, pid):
+                    # specifically for subs w/o WxH in title, but still
+                    # have images to download (e.x. imaginarystarscapes)
+                    log.debug("Image successfully downloaded WITHOUT"
+                              " WxH in title")
                 else:
                     MAXPOSTS -= 1
             elif not Check_width_height(pid):
@@ -505,7 +552,7 @@ def Get_data_from_pic(subreddit):
                 
                 image_list.append(image_name)
         i += 1
-    c_logger.debug("Exiting Get_data_from_pic fn")
+    log.debug("Exiting Get_data_from_pic fn")
 
 ####################################################################
 #REQUIRES setpaper is the command particular to each 
@@ -517,14 +564,14 @@ def Set_wallpaper(image_name):
     try:                            
         subprocess.call(args = SETWALLPAPER + image_name, 
                         shell = True)
-        c_logger.debug("Wallpaper should be set to: %s"
+        log.debug("Wallpaper should be set to: %s"
                            " Cycle time: %d seconds",
                            image_name, (CYCLETIME*60))
                             
     except KeyboardInterrupt:
             sys.exit(0)
     except:
-        c_logger.exception("Error setting wallpaper, it is likely the "
+        log.exception("Error setting wallpaper, it is likely the "
               "file path is not 100% correct. Make sure "
               "there is a foward slash at the end of the "
               "path in the SETWALLPAPER variable.", exc_info=True)
@@ -538,7 +585,7 @@ def Set_wallpaper(image_name):
 def Cycle_wallpaper():
     global image_list
     
-    c_logger.debug("MAXPOSTS is: %s", MAXPOSTS)
+    log.debug("MAXPOSTS is: %s", MAXPOSTS)
     
     for i in range(0, MAXPOSTS, 1):
         Set_wallpaper(image_list[i])
