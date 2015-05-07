@@ -13,3 +13,9 @@
 
 5/4/2015
 * added logging to external file, removed print statements
+
+5/6/2015
+* added Flickr support to download images linked from the regular Flickr site
+
+5/7/2015
+* added deviantart support explicitly, and improved support for other sites such as artstation. This also allows users to download images from subreddits that do not require width and height formatting in the title.
