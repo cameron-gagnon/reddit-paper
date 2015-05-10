@@ -47,7 +47,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "wallpapers"
+SUBREDDITS = "wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -151,9 +151,9 @@ def Connected(url):
         return True
     except (HTTPError, URLError, timeout, AttributeError, ValueError):
         log.error("You do not appear to be connected to Reddit.com."
-                       " Tthis is likely due to a redirect by the internet connection"
-                       " you are on. Check to make sure no login is required and the"
-                       " connection is stable, and then try again.")
+                  " Tthis is likely due to a redirect by the internet connection"
+                  " you are on. Check to make sure no login is required and the"
+                  " connection is stable, and then try again.")
         return False
 
 ####################################################################
@@ -198,13 +198,15 @@ def General_parser(img_link):
 # https://www.flickr.com/services/api/misc.urls.html
 def Flickr_parse(url):
     try:
-        #gets the page and reads the hmtl into flickr_html
+        # gets the page and reads the hmtl into flickr_html
         flickr_html = urllib.request.urlopen(url).read()
-        #searches for static flickr url within webpage
+        # searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
         
-        #soup = BeautifulSoup(flickr_html)
-
+        # at the moment, BeautifulSoup would be too difficult to 
+        # use to parse the html for the link, as the link is not within
+        # standard html anyway. (It's located in 'Model Export' towards the
+        # bottom of the page)
         img_link = re.findall(r"""
                               farm      # farm is always in static img url
                               [^"\\:]*  # characters to not capture
@@ -248,10 +250,12 @@ def Flickr_parse(url):
 def Five00px_parse(url):
     try:
         #refer to Flickr_parse for explanation of this method
-        px_html = urllib.request.urlopen(url).read()
-        px_html = px_html.decode('utf-8')
+        px_html = urllib.request.urlopen(url)
     
-        img_link = re.findall(r'https://drscdn.500px.org/photo[^"][\w/%]*', px_html)[0]
+        img_html = BeautifulSoup(px_html)
+        
+        # finds the html with class 'the_photo' and returns the src of that elt
+        img_link = img_html.select('.the_photo')[0].get('src')
         url = img_link
             
         return General_parser(img_link), url
@@ -268,17 +272,25 @@ def Five00px_parse(url):
 ####################################################################
 # Very similar to Five00px_parse and Flickr_parse, look through there
 # for details of workings on this method
-def Deviant_parse(url):
+def Deviant_parse(url, regex):
     try:
-        dev_html = urllib.request.urlopen(url).read()
-        dev_html = dev_html.decode('utf-8')
-    
-        img_link = re.findall(r'src="[\w=":;,%_ /.\n-]* class="dev-content-normal"',
-                              dev_html)[0]
-        link = re.findall(r'http://[\w./%-]*', img_link)[0]
-        url = link
+
+        dev_html = urllib.request.urlopen(url)
+
+        # direct image download link
+        if regex[:2] == "fc":
         
-        return General_parser(link), url
+            return General_parser(url), url
+        else:
+            img_html = BeautifulSoup(dev_html)
+        
+            # finds all classes with 'dev-content-normal' and finds the src
+            # attribute of it
+            img_link = img_html.select('.dev-content-normal')[0].get('src')
+            url = img_link 
+           
+            return General_parser(url), url
+
     except KeyboardInterrupt:
         sys.exit(0)
     except IndexError:
@@ -409,7 +421,7 @@ def Title_from_url(url, pid):
         # deviantart domain
         elif (regex_result[0].find("deviantart") != -1):
             
-            image_name, url = Deviant_parse(url)
+            image_name, url = Deviant_parse(url, regex_result[0])
             
             return image_name, url, True
 
@@ -486,7 +498,7 @@ def Insert_to_db(pid, image_name, width, height):
     sql.commit()
 
 ####################################################################
-#REQUIRES Full title of post which requires the reslotuion of the
+#REQUIRES Full title of post which may have the reslotuion of the
 #         image
 #MODIFIES nothing
 #EFFECTS  Returns true if 
@@ -509,8 +521,8 @@ def Valid_width_height(submission_title, pid, image_name):
 
     except IndexError:
         log.debug("The title of the submission does not appear"
-              " to be formatted correctly. Skipping"
-              " submission and trying the next one.")
+                  " to contain the width and height of the image.")
+
 ####################################################################
 #REQUIRES width, height from valid pid in database
 #MODIFIES nothing
@@ -522,10 +534,10 @@ def Check_width_height(pid):
     
     log.debug("Lookup from Check_width_height: %s", lookup)
     
-    width = lookup[2]
-    height = lookup[3]
+    try: 
+        width = lookup[2]
+        height = lookup[3]
     
-    try:
         if ((int(width) > MINWIDTH) and \
             (int(height) > MINHEIGHT)):
             return True
@@ -534,6 +546,9 @@ def Check_width_height(pid):
     except ValueError:
         log.exception("Incorrect type comparison for width and height"
               " most likely an incorrect parsing of title.", exc_info=True)
+    except TypeError:
+        log.exception("Likely an image that did not include WxH in title",
+                      exc_info=True)
 
 ####################################################################
 #REQUIRES width, height and ID of the image
@@ -546,7 +561,7 @@ def Lookup_width_height(pid, image_name):
         return True
     else:
         log.info("Image: %s does not fit required size. "
-                      "Will not download.", image_name)
+                 "Will not download.", image_name)
         return False
 
 ####################################################################
@@ -565,7 +580,7 @@ def Download_img(url, image_name, pid):
     try:
         picdl = urllib.request.urlopen(picdl)
 
-    except urllib.error.HTTPError as err:
+    except urllib.error.HTTPError:
         log.exception("ERROR: occured in Setting up the url!!\n",
                            exc_info=True)
         return False
@@ -615,10 +630,11 @@ def Get_data_from_pic(subreddit):
                                        pid, image_name) and\
                     Download_img(url, image_name, pid):
                     log.debug("Image successfully downloaded with"
-                            " WxH in title")
+                              " WxH in title")
 
                 elif is_deviant and\
-                     Download_img(url, image_name, pid):
+                     Download_img(url, image_name, pid) and\
+                     Check_width_height(pid):
                     # specifically for subs w/o WxH in title, but still
                     # have images to download (e.x. imaginarystarscapes)
                     log.debug("Image successfully downloaded WITHOUT"
