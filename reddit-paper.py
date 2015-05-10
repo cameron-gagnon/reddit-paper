@@ -76,7 +76,7 @@ rootLog.addHandler(fileHandle)
 # configures logging to console
 # set console logger
 console = logging.StreamHandler()
-console.setLevel(logging.ERROR) #toggle console level output with this line
+console.setLevel(logging.DEBUG) #toggle console level output with this line
 # set format for console logger
 consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
 console.setFormatter(consoleFormat)
@@ -203,10 +203,12 @@ def Flickr_parse(url):
         #searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
         img_link = re.findall(r"""
-                              farm      #farm is always in static img url
-                              [^"\\:]*  #characters not to capture
-                              _[o|k|h|b]\.  #_o indicates original img per flickr standards
-                              [jpg|png|gif]* #file format is either png, jpg, or gif
+                              farm      # farm is always in static img url
+                              [^"\\:]*  # characters to not capture
+                              _[o|k|h|b]\.  # _o indicates original img per 
+                                              # flickr standards
+                              [jpg|png|gif]* # file format is either 
+                                             # png, jpg, or gif
                               """, flickr_html, re.VERBOSE)[0]    
         url = 'https://' + img_link
 
@@ -217,15 +219,20 @@ def Flickr_parse(url):
     except KeyboardInterrupt:
         sys.exit(0)
     
+    # no links/an error occured in finding links in html of page
+    except IndexError:
+        log.debug("Did not find any links in Flickr_parse")
+    
     # this (UnicodeDecodeError) is thrown when the file link is 
     # given to read, and cannot be decoded to "utf-8" therefore,
     # we just need to download the img normally anyway
     except UnicodeDecodeError:
         return General_parser(url), url
     except Exception:
-        log.warning("Exception occured in Flickr_parse",
+        log.warning("Exception occured, or image does not fit"
+                    " required size in Flickr_parse",
                          exc_info = True)
-        return False, False
+    return False, False
 
 ####################################################################
 #REQUIRES url
@@ -247,12 +254,14 @@ def Five00px_parse(url):
         return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
+    except IndexError:
+        log.debug("No links found in Five00px_parse")
     except UnicodeDecodeError:
         return General_parser(url), url
     except Exception:
         log.warning("Exception occured in Five00px_parse", 
                          exc_info = True)
-        return False, False
+    return False, False
 ####################################################################
 # Very similar to Five00px_parse and Flickr_parse, look through there
 # for details of workings on this method
@@ -269,6 +278,9 @@ def Deviant_parse(url):
         return General_parser(link), url
     except KeyboardInterrupt:
         sys.exit(0)
+    except IndexError:
+        log.debug("No links found in Deviant_parse")
+
     # this exception is when the good img url to download is
     # passed in. Since this url when opened is not html, it throws
     # this error, so we know we must find the image title and return
@@ -299,9 +311,16 @@ def Title_from_url(url, pid):
             remove = url.rindex('/')                        
             image_name =  url[-(len(url) - remove - 1):]
             
-            #makes the url have the same domain instead of
-            #just imgur.com
-            if image_name.rfind(".") == -1:
+            # check if it's a gif or not from imgur. These don't
+            # download/display
+            if (image_name.rfind(".gif") != -1)\
+                or (image_name.rfind(".gifv") != -1):
+                log.debug("Image is likely a gif or gifv, not downloading")
+                return False, False, False
+            
+            # makes the url have the same domain instead of
+            # just imgur.com
+            elif image_name.rfind(".") == -1:
                 
                 image_name += ".jpg"
                 url = "http://i.imgur.com/" + image_name
@@ -416,6 +435,7 @@ def Valid_width_height(submission_title, pid, image_name):
 
         result1 = result[0][0]
         result2 = result[0][1]
+        # 'erases' commas in title
         result1 = re.sub("[^\d\.]", "", result1)
         result2 = re.sub("[^\d\.]", "", result2)
         
@@ -516,8 +536,8 @@ def Get_data_from_pic(subreddit):
        
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                       "\n\t\t\t\t\t\t  URL of post: %s",
-                       submission_title, pid, url)
+                  "\n\t\t\t\t\t\t  URL of post: %s",
+                  submission_title, pid, url)
         
         image_name, url, is_deviant = Title_from_url(url, pid)
         
@@ -532,7 +552,7 @@ def Get_data_from_pic(subreddit):
                                        pid, image_name) and\
                     Download_img(url, image_name, pid):
                     log.debug("Image successfully downloaded with"
-                            "WxH in title")
+                            " WxH in title")
 
                 elif is_deviant and\
                      Download_img(url, image_name, pid):
