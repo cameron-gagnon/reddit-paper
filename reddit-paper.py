@@ -27,11 +27,9 @@ import praw
 import sqlite3
 import pprint
 import argparse
-import ctypes
 import json
 import os
 import subprocess
-import random
 import re
 import sys 
 import time
