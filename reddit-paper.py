@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.4
 
 # Created by Cameron Gagnon
-# Version: alpha
+# Version: beta
 # Contact: cgagnon@umich.edu or 
 #          cameron.gagnon@gmail.com
 #
@@ -47,7 +47,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "lavaporn"
+SUBREDDITS = "wallpapers"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -202,6 +202,9 @@ def Flickr_parse(url):
         flickr_html = urllib.request.urlopen(url).read()
         #searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
+        
+        #soup = BeautifulSoup(flickr_html)
+
         img_link = re.findall(r"""
                               farm      # farm is always in static img url
                               [^"\\:]*  # characters to not capture
@@ -292,6 +295,75 @@ def Deviant_parse(url):
                          exc_info = True)
         return False, False
 ####################################################################
+# REQUIRES url in imgur formatting
+# MODIFIES url, image_name
+# EFFECTS  Returns the image name from the url. Helper function to
+#          imgur parse function.
+def Imgur_image_format(url):
+    # finds last '/' in url
+    remove = url.rindex('/')
+    # returns only past the last '/'
+    image_name =  url[-(len(url) - remove - 1):]
+    
+    if image_name.rfind('.') == -1:
+        image_name = image_name + ".jpg"
+        
+    log.debug("Image name is: %s", image_name)
+    return image_name
+
+####################################################################
+# REQUIRES valid imgur url
+# MODIFIES image_name
+# EFFECTS  Retrives direct image link from imgur.com when posted
+#          as either an album, or gallery. 
+#   An album example: https://imgur.com/a/dLB0
+#   A gallery example: https://imgur.com/gallery/fDdj6hw
+def Imgur_parse(url, regex):
+
+    # check if it's a gif or not from imgur. These don't
+    # download/display
+    if (url.rfind(".gif") != -1)\
+        or (url.rfind(".gifv") != -1):
+        
+        log.debug("Image is likely a gif or gifv, not downloading")
+        return False, False 
+
+    # then check if it's a direct link
+    elif regex == "i.imgur.com":
+        image_name = Imgur_image_format(url)
+        return image_name, url
+
+    # check if an imgur.com/gallery link
+    elif (url.find('/gallery/') != -1):
+        image_name = Imgur_image_format(url)
+        url = "https://i.imgur.com/" + image_name   
+        return image_name, url
+
+    # /a/ means an album in imgur standards
+    elif (url.find('/a/') != -1):
+        # have to find new url to download the first image from album
+        uaurl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
+        imgur_html = urllib.request.urlopen(uaurl)
+        soup = BeautifulSoup(imgur_html)
+        
+        #   | class=image  w/ child <a> | gets href of this <a> child |
+        url = soup.select('.image a')[0].get('href')
+        url = "https:" + url
+        image_name = Imgur_image_format(url)
+        return image_name, url
+
+    # a regular imgur.com domain but no img type in url
+    elif regex == "imgur.com":
+        image_name = Imgur_image_format(url)
+        url = "https://i.imgur.com/" + image_name
+        return image_name, url
+
+    # if we get here, there's like a format of url error
+    else:
+        log.debug("Something went wrong in Imgur_parse")
+        return False, False
+
+####################################################################
 #REQUIRES url of image to be renamed 
 #MODIFIES nothing
 #EFFECTS  Outputs the image title and URL of the photo being downloaded
@@ -305,58 +377,49 @@ def Title_from_url(url, pid):
                                                     url, re.IGNORECASE)
         log.debug("Regex (domain) from URL is: %s ", regex_result)
         
-        if regex_result[0] == "i.imgur.com" or \
-           regex_result[0] == "imgur.com":
-    
-            remove = url.rindex('/')                        
-            image_name =  url[-(len(url) - remove - 1):]
-            
-            # check if it's a gif or not from imgur. These don't
-            # download/display
-            if (image_name.rfind(".gif") != -1)\
-                or (image_name.rfind(".gifv") != -1):
-                log.debug("Image is likely a gif or gifv, not downloading")
+        # imgur domain
+        if regex_result[0] == "imgur.com" or \
+           regex_result[0] == "i.imgur.com":
+           
+            # check if we encountered bad data such as a gif or gifv
+            return1, return2 = Imgur_parse(url, regex_result[0])
+            if not return1:
                 return False, False, False
-            
-            # makes the url have the same domain instead of
-            # just imgur.com
-            elif image_name.rfind(".") == -1:
-                
-                image_name += ".jpg"
-                url = "http://i.imgur.com/" + image_name
-                
-                log.debug("Image_name is: %s ", image_name)
-                
-                return image_name, url, True
             else:
-                log.debug("Image_name is: %s ", image_name)
-                
-                return image_name, url, True
+                return return1, return2, True
 
+        # staticflickr domain
         elif (regex_result[0].find("staticflickr") != -1):
             remove = url.rindex('/')                        
             image_name =  url[-(len(url) - remove - 1):]
             
             return image_name, url, True
-
+        # flickr domain
         elif (regex_result[0].find("flickr") != -1):
             
             image_name, url = Flickr_parse(url)
             
             return image_name, url, True
-
+        # 500px domain
         elif (regex_result[0].find("500px.com") != -1):
             
             image_name, url = Five00px_parse(url)
 
             return image_name, url, True
-        
+        # deviantart domain
         elif (regex_result[0].find("deviantart") != -1):
             
             image_name, url = Deviant_parse(url)
             
             return image_name, url, True
-        
+
+        # pic.ms just a slight change in url formatting
+        elif (regex_result[0].find("pic.ms") != -1):
+            url = re.sub(r'html/', '', url)
+            image_name = General_parser(url)
+            return image_name, url, True
+
+        # all other domains with image type in url
         elif (url.find(".jpg") != -1) or (url.find(".png") != -1)\
              or (url.find(".gif") != -1):
             
