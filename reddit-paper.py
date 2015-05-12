@@ -207,14 +207,15 @@ def Flickr_parse(url):
         # bottom of the page)
         img_link = re.findall(r"""
                               farm      # farm is always in static img url
-                              [^"\\:]*  # characters to not capture
+                              [^":]*  # characters to not capture
                               _[o|k|h|b]\.  # _o indicates original img per 
                                               # flickr standards
                               [jpg|png|gif]* # file format is either 
                                              # png, jpg, or gif
                               """, flickr_html, re.VERBOSE)[0]    
         url = 'https://' + img_link
-
+        # finds urls with \ in them so we must remove them
+        url = url.replace('\\', '')
         log.debug("img_link from flickr regex: %s", img_link)
         #generates image_name from static url
         
@@ -223,7 +224,7 @@ def Flickr_parse(url):
         sys.exit(0)
     
     # no links/an error occured in finding links in html of page
-    except IndexError:
+    except (IndexError,TypeError):
         log.debug("Did not find any links in Flickr_parse")
     
     # this (UnicodeDecodeError) is thrown when the file link is 
@@ -259,7 +260,7 @@ def Five00px_parse(url):
         return General_parser(img_link), url
     except KeyboardInterrupt:
         sys.exit(0)
-    except IndexError:
+    except (IndexError,TypeError):
         log.debug("No links found in Five00px_parse")
     except UnicodeDecodeError:
         return General_parser(url), url
@@ -276,7 +277,7 @@ def Deviant_parse(url, regex):
         dev_html = urllib.request.urlopen(url)
 
         # direct image download link
-        if regex[:2] == "fc":
+        if regex[:2] == "fc" or regex[:4] == "orig":
         
             return General_parser(url), url
         else:
@@ -291,7 +292,7 @@ def Deviant_parse(url, regex):
 
     except KeyboardInterrupt:
         sys.exit(0)
-    except IndexError:
+    except (IndexError,TypeError):
         log.debug("No links found in Deviant_parse")
 
     # this exception is when the good img url to download is
@@ -547,6 +548,7 @@ def Check_width_height(pid):
     except TypeError:
         log.exception("Likely an image that did not include WxH in title",
                       exc_info=True)
+        return True
 
 ####################################################################
 #REQUIRES width, height and ID of the image
