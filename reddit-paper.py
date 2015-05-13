@@ -45,7 +45,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
+SUBREDDITS = "futureporn" #"wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -430,6 +430,10 @@ def Title_from_url(url, pid):
             image_name = General_parser(url)
             return image_name, url, True
 
+        # reddit.com self post
+        elif (regex_result[0].find("reddit.com") != -1):
+            log.debug("Appears to be a self post from reddit.com")
+            return False, False, False
         # all other domains with image type in url
         elif (url.find(".jpg") != -1) or (url.find(".png") != -1)\
              or (url.find(".gif") != -1):
@@ -537,8 +541,8 @@ def Check_width_height(pid):
         width = lookup[2]
         height = lookup[3]
     
-        if ((int(width) > MINWIDTH) and \
-            (int(height) > MINHEIGHT)):
+        if ((int(width) >= MINWIDTH) and \
+            (int(height) >= MINHEIGHT)):
             return True
         else:
             return False
