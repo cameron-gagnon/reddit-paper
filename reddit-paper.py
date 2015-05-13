@@ -116,10 +116,8 @@ def main():
         r = Login(USERNAME, PASSWORD)
     
         log.info("Fetching subreddits from %s", SUBREDDITS)
-        subreddit = r.get_subreddit(SUBREDDITS)
-        
         log.info("Pulling top %s posts", MAXPOSTS)
-        Get_data_from_pic(subreddit)
+        Get_data_from_pic(r)
         
         Cycle_wallpaper()
         
@@ -603,14 +601,16 @@ def Download_img(url, image_name, pid):
 #MODIFIES download location, adds new picture to file
 #EFFECTS  Downloads a new picture from the url specified and saves
 #         it to the location specified from DOWNLOADLOCATION.
-def Get_data_from_pic(subreddit):
+def Get_data_from_pic(r):
     global image_list
     global MAXPOSTS
     global cur
     global sql
     
+    log.debug("URL of query is %s", URL)
+
     i = 1        
-    for post in subreddit.get_hot(limit = MAXPOSTS):
+    for post in r.get_content(url=URL, limit = MAXPOSTS):
  
         pid = post.id
         url = post.url
@@ -697,11 +697,14 @@ def Cycle_wallpaper():
     global image_list
     
     log.debug("MAXPOSTS is: %s", MAXPOSTS)
-    
-    for i in range(0, MAXPOSTS, 1):
-        Set_wallpaper(image_list[i])
-        time.sleep(CYCLETIME*60)
-
+    try: 
+        for i in range(0, MAXPOSTS, 1):
+            Set_wallpaper(image_list[i])
+            time.sleep(CYCLETIME*60)
+    except IndexError:
+        log.error("No posts appear to be in the specific "\
+                  "subreddit/category selected. Try another category, or add "
+                  "more subreddits to the list.")
 ###################################################################
 #REQUIRES command line args
 #MODIFIES some of the global variables declared at top of program
@@ -712,6 +715,9 @@ def Parse_cmd_args():
     global MINHEIGHT
     global CYCLETIME
     global MAXPOSTS
+    global CATEGORY
+    global URL
+
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.")
@@ -727,13 +733,17 @@ def Parse_cmd_args():
     parser.add_argument("-t", "--cycletime", type = float,
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper", default = .05)
+    parser.add_argument("-c", "--category", type = str,
+                        help="Ex. hot, new, rising, top", default = "hot")
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
     MINHEIGHT = int(args.minheight)
     MAXPOSTS = int(args.maxposts)
     CYCLETIME = float(args.cycletime)
-    
+    CATEGORY = str(args.category)
+    URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
+
 ###################################################################
 if __name__ == '__main__':
     main()
