@@ -37,6 +37,7 @@ import urllib.request
 import subprocess
 import logging
 import logging.handlers
+from PIL import Image
 from bs4 import BeautifulSoup
 from collections import OrderedDict
 from distutils import spawn
@@ -45,7 +46,7 @@ from urllib.error import HTTPError,URLError
 
 #sets up global vars
 CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "futureporn" #"wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
+SUBREDDITS = "futureporn+wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
 USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
             "beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
@@ -54,7 +55,6 @@ SETWALLPAPER = "gsettings set org.gnome.desktop.background " \
                                                                 "/reddit/"
 DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
                                                                 "/reddit/"
-
 
 ### BEGIN LOGGING CONFIG
 # configures logging to external file
@@ -66,7 +66,7 @@ formatFile = logging.Formatter(fmt='%(asctime)-s %(levelname)-6s: '\
                                    '%(lineno)d : %(message)s',
                                datefmt='%m-%d %H:%M')
 # add filehandler so once the filesize reaches 5MB a new file is 
-# created, up to 5 files
+# created, up to 3 files
 fileHandle = logging.handlers.RotatingFileHandler(
                             "CrashReport.log", maxBytes=5000000, backupCount=3)
 fileHandle.setFormatter(formatFile)
@@ -83,13 +83,14 @@ logging.getLogger('').addHandler(console)
 log = logging.getLogger('reddit-paper')
 ### END LOGGING CONFIG
 
+# MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
+# FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
 
 # declared as global in functions so we can
 # decrement MAXPOSTS when we encounter an img
 # that != width/height requirements. This is
 # because in Cycle_wallpaper, it will cycle
 # the list of images from 0 to MAXPOSTS
-MAXPOSTS = 5
 image_list = []
 sql = sqlite3.connect('wallpaper.db')
 cur = sql.cursor()
@@ -107,14 +108,22 @@ def main():
             #each line so login will work
             USERNAME = infile.readline().rstrip('\n')
             PASSWORD = infile.readline().rstrip('\n')
-        
+    
         log.info("Accessing database for submission ID's")
         cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                               Name TEXT, Width INT, Height INT)')
         sql.commit()
         
         r = Login(USERNAME, PASSWORD)
-    
+
+        # if a link is provided to download
+        if (SINGLELINK):
+            image = Img(SINGLELINK)
+            image.getImg()
+            image.setWallpaper()
+            return
+
+
         log.info("Fetching subreddits from %s", SUBREDDITS)
         log.info("Pulling top %s posts", MAXPOSTS)
         Get_data_from_pic(r)
@@ -128,6 +137,67 @@ def main():
         log.info("CTRL + C entered from command line, exiting...")
         sys.exit(0)
 
+
+####################################################################
+### CLASS IMPLEMNTATIONS
+####################################################################
+
+class Img():
+
+    def __init__(self, link = None):
+        self._link = link
+        self.setImgName(link)
+        self._save_location = DOWNLOADLOCATION + str(self._image_name)
+        
+    
+    def getImgName(self):
+        return self._image_name
+
+
+    def setImgName(self, link):
+        remove = link.rindex('/')                        
+        self._image_name = link[-(len(link) - remove - 1):]
+
+
+    def getImg(self):
+        try:
+            pic = urllib.request.urlopen(self._link)
+
+        except urllib.error.HTTPError:
+            log.exception("ERROR: exception occured while downloading"
+                          " URL: %s\n", self._link, exc_info=True)
+            return False
+
+        log.info("Downloading link: %s \n\t\t\t\t\t\t  as: %s "\
+                 "\n\t\t\t\t\t\t  to: %s",
+                 self._link, self._image_name, self._save_location)
+    
+        with open(self._save_location, "wb") as picfile:
+            picfile.write(pic.read())
+        
+        return True
+
+    
+    def setWallpaper(self):
+        try:                            
+            subprocess.call(args = SETWALLPAPER + self._image_name, 
+                            shell = True)
+            log.debug("Wallpaper should be set to: %s"
+                               " Cycle time: %d seconds",
+                               self._image_name, (CYCLETIME*60))
+                                
+        except KeyboardInterrupt:
+                sys.exit(0)
+        except:
+            log.exception("Error setting wallpaper, it is likely the "
+                  "file path is not 100% correct. Make sure "
+                  "there is a foward slash at the end of the "
+                  "path in the SETWALLPAPER variable.", exc_info=True)
+            sys.exit(1)
+
+
+
+####################################################################
 ### METHOD IMPLEMENTATIONS
 ####################################################################
 #REQUIRES url
@@ -274,8 +344,10 @@ def Deviant_parse(url, regex):
 
         dev_html = urllib.request.urlopen(url)
 
-        # direct image download link
-        if regex[:2] == "fc" or regex[:4] == "orig":
+        # direct image download link that must begin with
+        # fc or orig or pree
+        if regex[:2] == "fc" or regex[:4] == "orig" or\
+           regex[:3] == "pre":
         
             return General_parser(url), url
         else:
@@ -290,7 +362,7 @@ def Deviant_parse(url, regex):
 
     except KeyboardInterrupt:
         sys.exit(0)
-    except (IndexError,TypeError):
+    except (IndexError, TypeError):
         log.debug("No links found in Deviant_parse")
 
     # this exception is when the good img url to download is
@@ -552,6 +624,28 @@ def Check_width_height(pid):
                       exc_info=True)
         return True
 
+
+######################################################################
+#REQUIRES checks the image for the width and height from the PIL module
+#MODIFIES nothing
+#EFFECTS  Returns true if the width and height are above specified
+#         dimensions
+def PIL_width_height(image_name):
+    try: 
+        # get size of image by checking it after it has already downloaded
+        im = Image.open(DOWNLOADLOCATION + image_name)
+        width, height = im.size
+
+        if ((int(width) >= MINWIDTH) and \
+            (int(height) >= MINHEIGHT)):
+            return True
+        else:
+            return False
+    except ValueError:
+        log.exception("Incorrect type comparison for width and height"
+                      " most likely an incorrect parsing of title.", exc_info=True)
+
+
 ####################################################################
 #REQUIRES width, height and ID of the image
 #MODIFIES nothing
@@ -574,7 +668,7 @@ def Lookup_width_height(pid, image_name):
 def Download_img(url, image_name, pid):
     global image_list
     
-    #gets the pic download information and sets the download location
+    # gets the pic download information and sets the download location
     picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
     local_save = DOWNLOADLOCATION + image_name
     log.debug("URL is: %s", url)
@@ -638,7 +732,8 @@ def Get_data_from_pic(r):
 
                 elif is_deviant and\
                      Download_img(url, image_name, pid) and\
-                     Check_width_height(pid):
+                     PIL_width_height(image_name):
+                     #Check_width_height(pid):
                     # specifically for subs w/o WxH in title, but still
                     # have images to download (e.x. imaginarystarscapes)
                     log.debug("Image successfully downloaded WITHOUT"
@@ -717,6 +812,7 @@ def Parse_cmd_args():
     global MAXPOSTS
     global CATEGORY
     global URL
+    global SINGLELINK
 
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
@@ -735,6 +831,9 @@ def Parse_cmd_args():
                              "will be set as wallpaper", default = .05)
     parser.add_argument("-c", "--category", type = str,
                         help="Ex. hot, new, rising, top", default = "hot")
+    parser.add_argument("-l", "--link", type = str,
+                        help="Provide a direct image link to download"
+                             " just the specified link", default = None) 
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
@@ -742,6 +841,7 @@ def Parse_cmd_args():
     MAXPOSTS = int(args.maxposts)
     CYCLETIME = float(args.cycletime)
     CATEGORY = str(args.category)
+    SINGLELINK = str(args.link)
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
 
 ###################################################################
