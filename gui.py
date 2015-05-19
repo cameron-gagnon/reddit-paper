@@ -1,7 +1,9 @@
 #!/usr/bin/env python3.4
 
 from tkinter import *
+
 LARGE_FONT = {"Verdana", "12"}
+CURSOR = "plus"
 
 class Application(Tk):
     
@@ -16,8 +18,8 @@ class Application(Tk):
         root.pack(side = "top", fill = "both", expand = True)
 
         # set minsize of application
-        self.minsize(width = 525, height = 550)
-
+        self.setUpWindow() 
+        
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
         
@@ -25,72 +27,84 @@ class Application(Tk):
         
         # window used to pack the pages into
         self.window = Frame(root, bg = "cyan")         
-        self.window.pack(fill = "both", expand = True)
+        self.window.pack()
 
         for F in (CurrentImg, PastImgs, Settings, About):
             frame = F(self.window, self)
             self.frames[F] = frame
             frame.grid(row = 0, column = 0, sticky = "nsew")
-            #frame.pack()
+
+        # frame to show on startup
         self.show_frame(CurrentImg)
 
-    # Input - page to display
-    # Output - displays the page selected
     def show_frame(self, cont):
+        """
+            Input: the page to display
+            Output: displays the page selected on butotn click
+        """
         frame = self.frames[cont]
         frame.tkraise()
+
+    def setUpWindow(self):
+        """ 
+            Aligns the GUI to open in the middle
+            of the screen(s)
+            credit: https://stackoverflow.com/questions/
+                    14910858/how-to-specify-where-a-tkinter-window-opens
+        """
+        ws = self.winfo_screenwidth()
+        hs = self.winfo_screenheight()
+        w = 525
+        h = 550
+        x = (ws/2) - (w/2)
+        y = (hs/2) - (h/2)
+        self.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        
 
 class AddButtons(Frame):
 
     def __init__(self, master, cls):
         Frame.__init__(self, master)
         self.topbar = Frame(master, bg="red")
+
         # current image button
         self.cphoto = PhotoImage(file="./images/currentpic_square.png")
         self.c = Button(self.topbar, image = self.cphoto, 
-                        width = 125, height = 125,
+                        width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(CurrentImg))
         self.c.grid(row = 0, column = 0, sticky = "N")
-#self.c.pack(side = "top")
 
         # past image button
         self.pphoto = PhotoImage(file="./images/pastpic_square.png")
         self.p = Button(self.topbar, image = self.pphoto, 
-                        width = 125, height = 125,
+                        width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(PastImgs))
         self.p.grid(row = 0, column = 1, sticky = "N")
-#self.p.pack(side = "top")
 
         # settings buttons
         self.sphoto = PhotoImage(file="./images/settingpic_square.png")
         self.s = Button(self.topbar, image = self.sphoto, 
-                        width = 125, height = 125,
+                        width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(Settings))
         self.s.grid(row=0, column = 2, sticky = "N")
-#self.s.pack(side = "top")
 
         # about buttons
         self.aphoto = PhotoImage(file="./images/aboutpic_square.png")
         self.a = Button(self.topbar, image = self.aphoto, 
-                        width = 125, height = 125,
+                        width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
-#self.a.pack(side = "top")
 
-#self.topbar.grid(row = 0, columnspan = 4, sticky = "N")
-        self.topbar.pack(side = "top")
 
         # statusbar for bottom of application
-        self.status = Label(master, text="Preparing to do nothing...", bd=1,
+        self.statusbar = Label(master, text="Preparing to do nothing...", bd=1,
                             relief = SUNKEN, anchor = "w")
-        self.status.pack(side = "bottom", fill = "x", anchor = "w")
+        
+        # pack the labels/frame to window
+        self.statusbar.pack(side = "bottom", fill = "x", anchor = "w")
+        self.topbar.pack(side = "top")
 
-        #self.status = Label(master, text="Preparing to do nothing...", bd=1,
-        #                    relief = SUNKEN, anchor = "w")
-        #self.status.rowconfigure(1, weight = 2)
-        #self.status.grid(row = 2, sticky = "s")
-#self.status.pack(side = "bottom", fill = "x", expand = True)
-    
+
 
 # **** Current Image Page **** #
 # Shows a thumbnail of the current image set as the 
@@ -100,18 +114,27 @@ class CurrentImg(Frame):
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
 
-        self.frame = Frame(self, bg = "magenta")
-        self.frame.pack(side = "top", fill = "both", expand = True)
+        # create the frame to hold the widgets
+        self.frame = Frame(self, bg = "magenta", width = 525, height = 400)
 
-        label = Label(self.frame, text="Title/link to submission:", 
+        # link to submission of image
+        self.label = Label(self.frame, text="Title/link to submission:", 
                       font = LARGE_FONT, 
                       bg="blue")
-        label.pack(pady = 10, padx = 10)
-        label2 = Label(self.frame, text="here's another frame", 
-                       font = LARGE_FONT)
-        label2.pack()
+        self.label.pack(pady = 10, padx = 10)
 
+        # thumbnail of image currently set as background
+        self.photoLocation = "./images/currentpic_square.png"# "./images/placeholder400x400.png"
+        self.photo = PhotoImage(file = self.photoLocation)
+        self.photoLabel = Label(self.frame, image = self.photo)
+        
+        self.test = Label(self.frame, text = "testing 1, 2, 3...")
+        self.test.pack()
 
+        # pack frames/labels
+        self.frame.pack_propagate(0)
+        self.photoLabel.pack(side = "bottom", expand = True)
+        self.frame.pack(side = "top")
 
 
 # **** Past Images Page **** #
@@ -123,9 +146,15 @@ class PastImgs(Frame):
 
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
-        label = Label(self, text="Past Images", font = LARGE_FONT, bg="pink")
-        label.pack(pady = 10, padx = 10)
+        label = Label(self, text="Select and delete images", font = LARGE_FONT,
+                      bg="pink")
+        
+        self.picFrame = Frame(self, bg = "blue", width = 500, height = 340)        
 
+
+        # pack frames/labels
+        label.pack(anchor = "w", pady = (15, 0), padx = 10)
+        self.picFrame.pack(side = "bottom", padx = 10, pady = (0, 10))
 
 
 # **** Settings Page **** #
