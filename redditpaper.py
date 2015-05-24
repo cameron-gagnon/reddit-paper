@@ -115,6 +115,7 @@ class Img():
         self.setTitle(post.title)
         self.setLink(post.url)
         self.setID(post.id)
+        self.setNSFW(post.over_18)
 
     def setImgName(self, image_name):
         self.image_name = image_name
@@ -129,6 +130,8 @@ class Img():
     def setID(self, id):
         self.id = id
 
+    def setNSFW(self, nsfw):
+        self.nsfw = nsfw
     def setSaveLoc(self):
         self.save_location = DOWNLOADLOCATION + str(self.image_name)
 
@@ -846,6 +849,8 @@ def Download_img(url, im):
         image_list.append(im.image_name)
     
     return True
+
+
 ####################################################################
 #REQUIRES url 
 #MODIFIES download location, adds new picture to file
@@ -864,7 +869,8 @@ def Main_photo_controller(r):
         
         # creates image class which holds necessary data about post
         im = Img(post)
-       
+        
+           
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                   "\n\t\t\t\t\t\t  URL of post: %s",
@@ -873,9 +879,13 @@ def Main_photo_controller(r):
         image_name, url, is_deviant = Title_from_url(im)
         
         log.debug("is_deviant: %s", is_deviant)
-
+        
         if (not image_name or not url):
             MAXPOSTS -= 1
+        
+        # check if the post is nsfw
+        elif (NSFW and im.nsfw):
+            MAXPOSTS -=1
                         
         else:
             im.setImgName(image_name)
@@ -913,6 +923,7 @@ def Main_photo_controller(r):
         i += 1
     log.debug("Exiting Main_photo_controller fn")
 
+
 ####################################################################
 #REQUIRES setpaper is the command particular to each 
 #         gnome/desktop environment version that will set the 
@@ -936,6 +947,7 @@ def Set_wallpaper(image_name):
               "path in the SETWALLPAPER variable.", exc_info=True)
         sys.exit(1)
 
+
 ###################################################################
 #REQUIRES SETWALLPAPER command, and image_list 
 #MODIFIES wallpaper background of the computer
@@ -953,6 +965,8 @@ def Cycle_wallpaper():
         log.error("No posts appear to be in the specific "\
                   "subreddit/category selected. Try another category, or add "
                   "more subreddits to the list.")
+
+
 ###################################################################
 #REQUIRES command line args
 #MODIFIES some of the global variables declared at top of program
@@ -966,6 +980,7 @@ def Parse_cmd_args():
     global CATEGORY
     global URL
     global SINGLELINK
+    global NSFW
 
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
@@ -987,6 +1002,10 @@ def Parse_cmd_args():
     parser.add_argument("-l", "--link", type = str,
                         help="Provide a direct image link to download"
                              " just the specified link", default = None) 
+    parser.add_argument("-nsfw", type = bool,
+                        help="If selected, will filter over 18 y/o posts "
+                             "out of results with True/False after arg",
+                             default = False)
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
@@ -995,6 +1014,7 @@ def Parse_cmd_args():
     CYCLETIME = float(args.cycletime)
     CATEGORY = str(args.category)
     SINGLELINK = args.link
+    NSFW = args.nsfw
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
 
 ###################################################################
