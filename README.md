@@ -10,8 +10,8 @@ If anyone has comments, critiques, or contributions to this program, let me know
 
 **TODO LIST:**
 * ~~Add flickr support~~
-* ~~add different subreddit's support, such as ones that don't list width && height in title of post, to avoid~~
-* ~~incorrect parsing of title everytime~~
-* save photos into folders by date, then access these folders to set the correct images
+* ~~Add different subreddit's support, such as ones that don't list width && height in title of post, to avoid~~
+* ~~Incorrect parsing of title everytime~~
+* Save photos into folders by date, then access these folders to set the correct images
 * Add Windows support, then Mac
-* create gui
+* Create gui (in process)
