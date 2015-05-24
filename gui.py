@@ -24,7 +24,7 @@ class Application(Tk):
         root.pack(side = "top", fill = "both", expand = True)
 
         # set minsize of application
-        self.set_up_window() 
+        self.setUpWindow() 
         
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
@@ -51,7 +51,7 @@ class Application(Tk):
         frame = self.frames[cont]
         frame.tkraise()
 
-    def set_up_window(self):
+    def setUpWindow(self):
         """ 
             Aligns the GUI to open in the middle
             of the screen(s)
@@ -104,6 +104,7 @@ class Messages():
         
         # places popup onscreen
         popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        
 
 class AddButtons(Frame):
 
@@ -284,7 +285,7 @@ class PastImgs(Frame):
             returns the x,y coordinates of upper left corner of frame
         """
         return self.winfo_rootx(), self.winfo_rooty()
-
+        
 
 # **** Settings Page **** #
 # This is where most of the users choices will be made
