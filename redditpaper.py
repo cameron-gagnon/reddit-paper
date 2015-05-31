@@ -45,15 +45,12 @@ from urllib.error import HTTPError,URLError
 from requests.exceptions import ConnectionError
 
 #sets up global vars
-CREDENTIALS = "user_pass.txt"
 SUBREDDITS = "futureporn+wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
-USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
-            "beta testing"
+USERAGENT = "Reddit wallpaper changer script /u/camerongagnon beta testing"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background picture-uri "\
                "file:///media/cameron/Fresh500/pictures/wallofpapers"\
                                                                 "/reddit/"
-DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
-                                                                "/reddit/"
+DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers/reddit/"
 
 # MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
 # FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
@@ -531,7 +528,7 @@ def Deviant_parse(url, regex):
     except Exception:
         log.warning("Exception occured in Deviant_parse",
                          exc_info = True)
-        return False, False
+    return False, False
 ####################################################################
 # REQUIRES url in imgur formatting
 # MODIFIES url, image_name
@@ -629,7 +626,7 @@ def Title_from_url(im):
             remove = im.link.rindex('/')                        
             image_name =  im.link[-(len(im.link) - remove - 1):]
             
-            return image_name, url, True
+            return image_name, im.link, True
         
         # flickr domain
         elif (regex_result[0].find("flickr") != -1):
@@ -825,30 +822,34 @@ def Lookup_width_height(im):
 #MODIFIES file on hard drive, image_list
 #EFFECTS  Prints out the download name and location, then saves the
 #         picture to that spot.
-def Download_img(url, im):
+def Download_img(im):
     global image_list
     
     # gets the pic download information and sets the download location
-    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
-    log.debug("URL is: %s", url)
+    picdl = urllib.request.Request(im.link, headers = { 'User-Agent': USERAGENT})
+    log.debug("URL is: %s", im.link)
 
     try:
         picdl = urllib.request.urlopen(picdl)
 
     except urllib.error.HTTPError:
         log.exception("ERROR: occured in Setting up the url!!\n",
-                           exc_info=True)
+                           exc_info = True)
         return False
 
     log.info("Downloading: %s \n\t\t\t\t\t\t  as: %s "\
              "\n\t\t\t\t\t\t  to: %s",
-             url, im.image_name, im.save_location)
+             im.link, im.image_name, im.save_location)
     
-    with open(im.save_location, "wb") as picfile:
-        picfile.write(picdl.read())
-        image_list.append(im.image_name)
-    
-    return True
+    try:
+        with open(im.save_location, "wb") as picfile:
+            picfile.write(picdl.read())
+            image_list.append(im.image_name)
+        return True
+    except http.cient.IncompleteRead:
+        log.error("Could not download entire file. Try again "
+                  "when a better internet connection is "
+                  "identified.", exc_info = True)
 
 
 ####################################################################
@@ -889,13 +890,14 @@ def Main_photo_controller(r):
                         
         else:
             im.setImgName(image_name)
+            im.setLink(url)
 
             if not Already_downloaded(im):
-                if  Valid_width_height(im) and Download_img(url, im):
+                if  Valid_width_height(im) and Download_img(im):
                     log.debug("Image successfully downloaded with"
                               " WxH in title")
 
-                elif is_deviant and Download_img(url, im) and \
+                elif is_deviant and Download_img(im) and \
                      PIL_width_height(im.image_name):
                     # specifically for subs w/o WxH in title, but still
                     # have images to download (e.x. imaginarystarscapes)
@@ -981,6 +983,7 @@ def Parse_cmd_args():
     global URL
     global SINGLELINK
     global NSFW
+    global SUBREDDITS
 
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
@@ -1003,9 +1006,13 @@ def Parse_cmd_args():
                         help="Provide a direct image link to download"
                              " just the specified link", default = None) 
     parser.add_argument("-nsfw", type = bool,
-                        help="If selected, will filter over 18 y/o posts "
+                        help="If set to True, will filter nsfw posts "
                              "out of results with True/False after arg",
-                             default = False)
+                        default = False)
+    parser.add_argument("-s", "--subreddits", type = str,
+                        help="Specify the subreddits separated by a + "
+                             "that will be downloaded from",
+                        default = SUBREDDITS)
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
@@ -1015,6 +1022,8 @@ def Parse_cmd_args():
     CATEGORY = str(args.category)
     SINGLELINK = args.link
     NSFW = args.nsfw
+    SUBREDDITS = args.subreddits
+
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
 
 ###################################################################
