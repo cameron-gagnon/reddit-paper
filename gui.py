@@ -1,12 +1,14 @@
 #!/usr/bin/env python3.4
 
 import redditpaper as rp
+import webbrowser
 from tkinter import *
 from tkinter import ttk
 from PIL import Image
 
 LARGE_FONT = {"Verdana", "12"}
 CURSOR = "plus"
+HYPERLINK = "#0000EE"
 
 class Application(Tk):
 
@@ -63,6 +65,7 @@ class Application(Tk):
         self.x = (ws/2) - (self.width/2)
         self.y = (hs/2) - (self.height/2)
         self.minsize(width = self.width, height = self.height)
+        self.maxsize(width = self.width, height = self.height)
         self.geometry('%dx%d+%d+%d' % (self.width, self.height, self.x, self.y))
         
 
@@ -158,15 +161,18 @@ class CurrentImg(Frame):
 
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
+        self.link = "https://www.reddit.com/r/EarthPorn/comments/37vqde/"\
+                    "has_there_ever_been_a_more_badass_volcano_photo/"
 
         # create the frame to hold the widgets
-        self.frame = Frame(self, bg = "magenta", width = 525, height = 400)
-
+        self.frame = Frame(self, width = 525, height = 400)#bg = "magenta", 
+        
         # link to submission of image
         self.label = Label(self.frame, text="Title/link to submission:", 
-                      font = LARGE_FONT, 
-                      bg="blue")
+                           font = LARGE_FONT, 
+                           fg=HYPERLINK, cursor = "hand2")
         self.label.pack(pady = 10, padx = 10)
+        self.label.bind("<Button-1>", self.open_link)
 
         # thumbnail of image currently set as background
         self.photoLocation = "./images/currentpic_square.png"
@@ -174,14 +180,13 @@ class CurrentImg(Frame):
         self.photo = PhotoImage(file = self.photoLocation)
         self.photoLabel = Label(self.frame, image = self.photo)
         
-        self.test = Label(self.frame, text = "testing 1, 2, 3...")
-        self.test.pack()
-
         # pack frames/labels
         self.frame.pack_propagate(0)
         self.photoLabel.pack(side = "bottom", expand = True)
         self.frame.pack(side = "top")
 
+    def open_link(self, event):
+        webbrowser.open_new(self.link)
 
 # **** Past Images Page **** #
 # Gives a listing of past submissions, with a smaller thumbnail of the image
@@ -274,7 +279,7 @@ class PastImgs(Frame):
             # insert the thumbnail, title, and resolution
             Label(itemFrame, image = photo).pack(side = "left", padx = 10)
             Label(itemFrame, text = img.title).pack(side = "left", padx = 10)
-            Label(itemFrame, text = img.resolution).pack(side = "bottom", pady = 5)
+            Label(itemFrame, text = img.resolution).pack(side = "bottom", pady=5)
     
     def findSavedPictures(self):
         pictures = rp.PictureList.list_pics()
@@ -301,38 +306,83 @@ class Settings(Frame):
         Frame.__init__(self, parent)
         label = Label(self, text="Settings", font = LARGE_FONT, bg="yellow")
         label.pack(pady = 10, padx = 10)
-        self.entry = Frame(self) 
-        self.checks = Frame(self)
-        self.dimensions = Frame(self, width = 475, height = 20)
-        
+        self.entry = LabelFrame(self, text = "Authorization") 
+        self.subredditForm = LabelFrame(self, text = "Subreddits")
+        self.checks = LabelFrame(self, text = "Adult Content")
+        self.dimensions = LabelFrame(self, text = "Resolution")
+                
         # user/pass entries 
-        Label(self.entry, text = "Username: ").grid(row = 0, column = 0)
-        Label(self.entry, text = "Password: ").grid(row = 0, column = 2)
-        self.username = Entry(self.entry).grid(row = 0, column = 1)
-        self.password = Entry(self.entry).grid(row = 0, column = 3)
+        userTxt = Label(self.entry, text = "  Username:")
+        userTxt.grid(row = 0, column = 0, sticky = "e",\
+                     pady = (10, 6))
+        
+        passTxt = Label(self.entry, text = "Password:")
+        passTxt.grid(row = 1, column = 0, sticky = "e",\
+                     pady = (0, 6))
+
+        self.username = Entry(self.entry)
+        self.username.grid(row = 0, column = 1, padx = (0, 10))
+        self.password = Entry(self.entry, show = "*")
+        self.password.grid(row = 1, column = 1, padx = (0,10), pady = (0, 10))
         
         # subreddit entry
-        Label(self.entry, text = "Subreddits (separated by +)", pady = 15).grid(row = 1, columnspan = 2, sticky = "w")
-        self.subreddits = Entry(self.entry, width = 29).grid(row = 1, column = 2, columnspan = 2, sticky = "w")
+        subtxt = Label(self.subredditForm, text = "Subreddits (separated by +)",\
+                       pady = 15)
+        subtxt.grid(row = 2, columnspan = 2, ipadx = 5, sticky = "w")
+        
+        self.subreddits = Entry(self.subredditForm, width = 29)
+        self.subreddits.grid(row = 2, column = 2, columnspan = 2, padx = (0,10),\
+                             sticky = "w")
+        
         # Min width
-        Label(self.dimensions, text = "Min-width: ", pady = 15).pack(side = "left", anchor = "w")
-        self.minwidth = Entry(self.dimensions, width = 6).pack(side = "left", anchor = "w")
+        minWidthTxt = Label(self.dimensions, text = "Min-width: ", pady = 15)
+        minWidthTxt.pack(side = "left", anchor = "w", ipadx = 5)
+        # min width entry
+        self.minwidth = Entry(self.dimensions, width = 6)
+        self.minwidth.pack(side = "left", anchor = "w", ipadx = 5)
+        
         # Min height
-        Label(self.dimensions, text = "Min-height: ", pady = 15, padx = 10).pack(side = "left", anchor = "w")
-        self.minheight = Entry(self.dimensions, width = 6).pack(side = "left", anchor = "w")
+        minHeightTxt = Label(self.dimensions, text = "Min-height: ", pady = 15,\
+                             padx = 10)
+        minHeightTxt.pack(side = "left", anchor = "w")
+        # min height entry
+        self.minheight = Entry(self.dimensions, width = 6)
+        self.minheight.pack(side = "left", anchor = "w", padx = (0, 10))
         
         # nsfw checkbutton
-        Label(self.checks, text = "NSFW", pady = 15).pack(side = "left")
-        self.nsfwOn = StringVar().set("On")
-        self.nsfwOff = StringVar()
-        self.nsfw = Checkbutton(self.checks, text = self.nsfwOn, pady = 15).pack(side = "left")
+        # nsfw on text
+        nsfwTxt = Label(self.checks, text = "NSFW")
+        nsfwTxt.pack(side = "left", ipadx = 5)
+        self.nsfwOn = StringVar()
+        self.nsfwOn.set("On")
         
-        # packs
-        self.entry.pack(side = "top")
-        self.dimensions.pack_propagate(0)
-        self.dimensions.pack(side = "top")
-        self.checks.pack(side = "top")
+        # nsfw off text
+        self.nsfwOff = StringVar()
+        self.nsfwOff.set("Off")
+        # nsfw var config
+        self.onOff = IntVar()
 
+        # nsfw checkbutton config
+        self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),\
+                                variable = self.onOff)
+        # packs/binds
+        self.nsfw.bind("<Button-1>", self.check_nsfw)
+        self.nsfw.pack(side = "left", anchor = "w", pady = 10,\
+                       padx = (15, 10))
+        self.entry.pack(side = "top", anchor = "w", pady = 10,\
+                        padx = (15, 10))
+        self.subredditForm.pack(side = "top", anchor = "w", pady = 10,\
+                                padx = (15, 10))
+        self.dimensions.pack(side = "top", anchor = "w", pady = 10,\
+                             padx = (15, 10))
+        self.checks.pack(side = "top", anchor = "w", pady = 10,\
+                         padx = (15, 10))
+
+    def check_nsfw(self, event):
+        if (self.onOff.get()):
+            self.nsfw.config(text = self.nsfwOff.get())
+        else:
+            self.nsfw.config(text = self.nsfwOn.get())
 
 # **** About Page **** #
 # Displays information regarding the creator of the application,
