@@ -256,6 +256,14 @@ class PictureList():
         return image_list
 
 
+########################################################################
+class AboutInfo():
+    _version = "1.0"
+
+    def version():
+        return AboutInfo._version
+
+
 ####################################################################
 ### METHOD IMPLEMENTATIONS
 ####################################################################
@@ -283,7 +291,7 @@ def Config_logging():
     # configures logging to console
     # set console logger
     console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG) #toggle console level output with this line
+    console.setLevel(logging.ERROR) #toggle console level output with this line
     
     # set format for console logger
     consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
