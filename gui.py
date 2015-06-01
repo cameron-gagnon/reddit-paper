@@ -2,12 +2,14 @@
 
 import redditpaper as rp
 import webbrowser
+import os
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, filedialog
 from PIL import Image
 
 LARGE_FONT = {"Verdana", "12"}
-CURSOR = "plus"
+XLARGE_FONT = {"Verdana", "16"}
+CURSOR = "hand2"
 HYPERLINK = "#0000EE"
 
 class Application(Tk):
@@ -67,7 +69,36 @@ class Application(Tk):
         self.minsize(width = self.width, height = self.height)
         self.maxsize(width = self.width, height = self.height)
         self.geometry('%dx%d+%d+%d' % (self.width, self.height, self.x, self.y))
-        
+
+
+
+class AboutInfo():
+    """
+        Information about the GUI version, links to static sites (reddit,
+        and PayPal), and author name and information
+    """
+    _version = "1.0"
+    _author = "Cameron Gagnon"
+    _email = "cameron.gagnon@gmail.com"
+    _redditAcct = "https://www.reddit.com/message/compose/?to=camerongagnon"
+    _payPalAcct = " "
+    
+    def version():
+        return AboutInfo._version
+
+    def author():
+        return AboutInfo._author
+
+    def reddit():
+        return AboutInfo._redditAcct
+
+    def PayPal():
+        return AboutInfo._payPalAcct
+    
+    def email():
+        return AboutInfo._email
+
+
 
 class Messages():
     """
@@ -165,12 +196,13 @@ class CurrentImg(Frame):
                     "has_there_ever_been_a_more_badass_volcano_photo/"
 
         # create the frame to hold the widgets
-        self.frame = Frame(self, width = 525, height = 400)#bg = "magenta", 
+        self.frame = Frame(self, width = 525, height = 400,\
+                           bg = "magenta")
         
         # link to submission of image
         self.label = Label(self.frame, text="Title/link to submission:", 
                            font = LARGE_FONT, 
-                           fg=HYPERLINK, cursor = "hand2")
+                           fg=HYPERLINK, cursor = CURSOR)
         self.label.pack(pady = 10, padx = 10)
         self.label.bind("<Button-1>", self.open_link)
 
@@ -306,11 +338,16 @@ class Settings(Frame):
         Frame.__init__(self, parent)
         label = Label(self, text="Settings", font = LARGE_FONT, bg="yellow")
         label.pack(pady = 10, padx = 10)
-        self.entry = LabelFrame(self, text = "Authorization") 
+        self.top = Frame(self)
+        self.entry = LabelFrame(self.top, text = "Authorization") 
         self.subredditForm = LabelFrame(self, text = "Subreddits")
         self.checks = LabelFrame(self, text = "Adult Content")
-        self.dimensions = LabelFrame(self, text = "Resolution")
-                
+        self.dimensions = LabelFrame(self.top, text = "Minimum Picture Resolution")
+        self.res = Frame(self.dimensions)
+        
+        # Buttons
+        self.letsGo = Button(self, text = "Let's Go!", command = rp.main)
+
         # user/pass entries 
         userTxt = Label(self.entry, text = "  Username:")
         userTxt.grid(row = 0, column = 0, sticky = "e",\
@@ -334,21 +371,27 @@ class Settings(Frame):
         self.subreddits.grid(row = 2, column = 2, columnspan = 2, padx = (0,10),\
                              sticky = "w")
         
+        # Frames for width x height
+        self.widthF = Frame(self.res)
+        self.heightF = Frame(self.res)
+        self.widthF.pack(side = "top")
+        self.heightF.pack(side = "top")
+
         # Min width
-        minWidthTxt = Label(self.dimensions, text = "Min-width: ", pady = 15)
-        minWidthTxt.pack(side = "left", anchor = "w", ipadx = 5)
+        minWidthTxt = Label(self.widthF, text = " Min-width:")
+        minWidthTxt.grid(row = 0, column = 0, sticky = "e", pady = (10, 6))
         # min width entry
-        self.minwidth = Entry(self.dimensions, width = 6)
-        self.minwidth.pack(side = "left", anchor = "w", ipadx = 5)
+        self.minwidth = Entry(self.widthF, width = 6)
+        self.minwidth.grid(row = 0, column = 1, padx = (5, 5))
         
         # Min height
-        minHeightTxt = Label(self.dimensions, text = "Min-height: ", pady = 15,\
-                             padx = 10)
-        minHeightTxt.pack(side = "left", anchor = "w")
+        minHeightTxt = Label(self.heightF, text = "  Min-height:")
+        minHeightTxt.grid(row = 1, column = 0, sticky = "e", pady = (0, 6))
         # min height entry
-        self.minheight = Entry(self.dimensions, width = 6)
-        self.minheight.pack(side = "left", anchor = "w", padx = (0, 10))
+        self.minheight = Entry(self.heightF, width = 6)
+        self.minheight.grid(row = 1, column = 1, padx = (0, 10), pady = (0, 10))
         
+
         # nsfw checkbutton
         # nsfw on text
         nsfwTxt = Label(self.checks, text = "NSFW")
@@ -366,15 +409,20 @@ class Settings(Frame):
         self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),\
                                 variable = self.onOff)
         # packs/binds
+        # button packs
+        self.letsGo.pack(side = "bottom", anchor = "e", padx = 50, pady = 40)
         self.nsfw.bind("<Button-1>", self.check_nsfw)
         self.nsfw.pack(side = "left", anchor = "w", pady = 10,\
                        padx = (15, 10))
-        self.entry.pack(side = "top", anchor = "w", pady = 10,\
+        # top holds dimensions and user/pass labelFrames
+        self.top.pack(side = "top", anchor = "w", pady = 5)
+        self.entry.pack(side = "left", anchor = "w", pady = 10,\
                         padx = (15, 10))
-        self.subredditForm.pack(side = "top", anchor = "w", pady = 10,\
+        self.subredditForm.pack(side = "top", anchor = "w",\
                                 padx = (15, 10))
-        self.dimensions.pack(side = "top", anchor = "w", pady = 10,\
+        self.dimensions.pack(side = "left", anchor = "w", pady = 10,\
                              padx = (15, 10))
+        self.res.pack(side = "top")
         self.checks.pack(side = "top", anchor = "w", pady = 10,\
                          padx = (15, 10))
 
@@ -395,8 +443,83 @@ class About(Frame):
 
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
+        # frames
         label = Label(self, text="About", font = LARGE_FONT, bg="green")
         label.pack(pady = 10, padx = 10)
+        self.author = Frame(self)
+        self.donateFrame = Frame(self)
+        self.crashFrame = Frame(self)
+        self.versionFrame = Frame(self)
+        self.feedFrame = Frame(self)
+
+        # author
+        self.made = Label(self.author, text = "This program was created by: ",\
+                          font = XLARGE_FONT)
+        self.dev = Label(self.author, text="/u/camerongagnon", font = XLARGE_FONT, 
+                         fg=HYPERLINK, cursor = CURSOR)
+
+        # version #
+        self.vNum = StringVar()
+        self.vNum.set("Version: " + rp.AboutInfo.version() + "." +  AboutInfo.version())
+        self.version = Label(self.versionFrame, text = self.vNum.get(), font = XLARGE_FONT)
+        
+        # donate
+        self.donateTxt = Label(self.donateFrame, text = "If you enjoy this program, please " 
+                                                        "consider making\na donation to the "
+                                                        "developer at the following PayPal "
+                                                        "link:", font = XLARGE_FONT)
+        self.donateLink = Label(self.donateFrame, text = "here", fg = HYPERLINK,\
+                                font = XLARGE_FONT, cursor = CURSOR)
+        self.feedback = Label(self.feedFrame, text = "To provide comments and/or feedback, please "
+                                                     "do one of the following: \n"
+                                                     "1. Go to /r/reddit_paper and create a "
+                                                     "new post.\n2. Follow the above "
+                                                     "account link and send me a PM.\n3. Email "
+                                                     "me directly at cameron.gagnon@gmail.com",\
+                              font = XLARGE_FONT)
+        # send crashReport
+        self.crash_loc = StringVar()
+        self.location = self.get_crash_location()
+        self.crash_loc.set(self.location)
+
+        self.report = Label(self.crashFrame, text = "To send a crash report, please\n"
+                            "browse to the file location below and send the log\n"
+                            "to cameron.gagnon@gmail.com.", font = XLARGE_FONT)
+        self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get())
+
+
+        
+        
+        
+        # packs/binds
+        # author frame pack
+        self.made.pack(side = "left")
+        self.dev.pack(side = "left")
+        self.dev.bind("<Button-1>", lambda x: self.open_link(AboutInfo.reddit()))
+        self.author.pack(side = "top", pady = (15, 0))
+        # version frame pack
+        self.version.pack(side = "top")
+        self.versionFrame.pack(side = "top")
+        # donate frame pack
+        self.donateTxt.pack(side = "top")
+        self.donateLink.pack(side = "top")
+        self.donateLink.bind("<Button-1>", lambda x: self.open_link(AboutInfo.PayPal()))
+        self.donateFrame.pack(side = "top", pady = 15)
+        # feedback
+        self.feedback.pack(side = "top")
+        self.feedFrame.pack(side = "top", pady = 15)
+        # crash report pack
+        self.report.pack(side = "top")
+        self.crash_loc.pack(side = "top")
+        self.crashFrame.pack(side = "top", pady = 15)
+        
+    def open_link(self, link):
+        webbrowser.open_new(link)
+
+    def get_crash_location(self):
+        # opens a file browser for the user to 
+        # search for the log file
+        return os.path.realpath("CrashReport.log")
 
 
 app = Application()
