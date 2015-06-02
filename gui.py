@@ -4,30 +4,32 @@ import redditpaper as rp
 import webbrowser
 import os
 from tkinter import *
+from tkinter import font
 from tkinter import StringVar
 from tkinter import ttk
 from PIL import Image
 
-LARGE_FONT = {"Verdana", "12"}
-XLARGE_FONT = {"Verdana", "16"}
+FONT = "Verdana"
+LARGE_FONT = {FONT, "12"}
+XLARGE_FONT = {FONT, "16"}
 CURSOR = "hand2"
 HYPERLINK = "#0000EE"
 
 class Application(Tk):
-
     width = 525
     height = 550
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
         
-        # set title of application on titlebar
+                # set title of application on titlebar
         self.wm_title("Reddit Paper") 
         
         # set up frame to hold widgets
         root = Frame(self, background="bisque")
         root.pack(side = "top", fill = "both", expand = True)
-
+        
+        setUnderline(self) 
         # set minsize of application
         self.setUpWindow() 
         
@@ -142,9 +144,26 @@ class Messages():
         
         # places popup onscreen
         popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
-        
+
+
+def setUnderline(self):
+    """
+        Gives the ability to have entire strings of text
+        underlined. Used for links.
+    """
+    global UNDERLINE
+
+    # Defined in its own global function as the
+    # Font() call must be made after a Tk()
+    # instance has been created.
+    UNDERLINE = font.Font(self, XLARGE_FONT)
+    UNDERLINE.configure(underline = True)
+ 
+
+       
 
 class AddButtons(Frame):
+    STATUSTEXT = "asd"
 
     def __init__(self, master, cls):
         Frame.__init__(self, master)
@@ -177,19 +196,17 @@ class AddButtons(Frame):
                         width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
-        self.STATUSTEXT = StringVar()
-        self.setStatusText("")
 
         # statusbar for bottom of application        
-        self.statusbar = Label(master, text= self.STATUSTEXT.get(), bd=1,
+        self.statusbar = Label(master, text = AddButtons.STATUSTEXT, bd=1,
                             relief = SUNKEN, anchor = "w")
         
         # pack the labels/frame to window
         self.statusbar.pack(side = "bottom", fill = "x", anchor = "w")
         self.topbar.pack(side = "top")
-    
-    def setStatusText(self, text):
-        self.STATUSTEXT.set(text)
+
+    def setStatusText(text):
+        AddButtons.STATUSTEXT = text
 
 
 
@@ -206,10 +223,9 @@ class CurrentImg(Frame):
         # create the frame to hold the widgets
         self.frame = Frame(self, width = 525, height = 400,\
                            bg = "magenta")
-        
         # link to submission of image
         self.label = Label(self.frame, text="Title/link to submission:", 
-                           font = LARGE_FONT, 
+                           font = UNDERLINE, 
                            fg=HYPERLINK, cursor = CURSOR)
         self.label.pack(pady = 10, padx = 10)
         self.label.bind("<Button-1>", self.open_link)
@@ -448,9 +464,9 @@ class Settings(Frame):
 #                * Feedback
 #                * (Sending CrashReport)
 class About(Frame):
-
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
+       
         # frames
         label = Label(self, text="About", font = LARGE_FONT, bg="green")
         label.pack(pady = 10, padx = 10)
@@ -464,7 +480,7 @@ class About(Frame):
         # author
         self.authorTxt = Label(self.subAuthorFrame, text = "This program was created by: ",\
                           font = XLARGE_FONT)
-        self.authorLink = Label(self.subAuthorFrame, text="/u/camerongagnon", font = XLARGE_FONT, 
+        self.authorLink = Label(self.subAuthorFrame, text="/u/camerongagnon", font = UNDERLINE, 
                          fg=HYPERLINK, cursor = CURSOR)
 
         # version number
@@ -480,7 +496,8 @@ class About(Frame):
         self.donateTxt2 = Label(self.subDonateFrame, text = "to the developer at the following "
                                                             "link,", font = XLARGE_FONT) 
         self.donateLink = Label(self.subDonateFrame, text = "here.", fg = HYPERLINK,\
-                                font = XLARGE_FONT, cursor = CURSOR)
+                                font = UNDERLINE, cursor = CURSOR)
+
         # feedback
         self.feedback = Label(self.feedFrame, text = "To provide comments/feedback, please "
                                                      "do one of the following: \n"
