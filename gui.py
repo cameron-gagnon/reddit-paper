@@ -4,7 +4,8 @@ import redditpaper as rp
 import webbrowser
 import os
 from tkinter import *
-from tkinter import ttk, filedialog
+from tkinter import StringVar
+from tkinter import ttk
 from PIL import Image
 
 LARGE_FONT = {"Verdana", "12"}
@@ -81,7 +82,10 @@ class AboutInfo():
     _author = "Cameron Gagnon"
     _email = "cameron.gagnon@gmail.com"
     _redditAcct = "https://www.reddit.com/message/compose/?to=camerongagnon"
-    _payPalAcct = " "
+    _payPalAcct = "https://www.paypal.com/cgi-bin/webscr?cmd=_donations&"\
+                  "business=PKYUCH3L9HJZ6&lc=US&item_name=Cameron%20Gagnon"\
+                  "&item_number=81140022&currency_code=USD&bn=PP%2dDonations"\
+                  "BF%3abtn_donateCC_LG%2egif%3aNonHosted"
     
     def version():
         return AboutInfo._version
@@ -173,15 +177,19 @@ class AddButtons(Frame):
                         width = 125, height = 125, cursor = CURSOR,
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
+        self.STATUSTEXT = StringVar()
+        self.setStatusText("")
 
-
-        # statusbar for bottom of application
-        self.statusbar = Label(master, text="Preparing to do nothing...", bd=1,
+        # statusbar for bottom of application        
+        self.statusbar = Label(master, text= self.STATUSTEXT.get(), bd=1,
                             relief = SUNKEN, anchor = "w")
         
         # pack the labels/frame to window
         self.statusbar.pack(side = "bottom", fill = "x", anchor = "w")
         self.topbar.pack(side = "top")
+    
+    def setStatusText(self, text):
+        self.STATUSTEXT.set(text)
 
 
 
@@ -446,31 +454,35 @@ class About(Frame):
         # frames
         label = Label(self, text="About", font = LARGE_FONT, bg="green")
         label.pack(pady = 10, padx = 10)
-        self.author = Frame(self)
-        self.donateFrame = Frame(self)
-        self.crashFrame = Frame(self)
-        self.versionFrame = Frame(self)
-        self.feedFrame = Frame(self)
+        self.authorFrame = LabelFrame(self, text = "Author")
+        self.donateFrame = LabelFrame(self, text = "Donations")
+        self.crashFrame = LabelFrame(self, text = "Crash Report")
+        self.versionFrame = Frame(self.authorFrame)
+        self.subAuthorFrame = Frame(self.authorFrame)
+        self.feedFrame = LabelFrame(self, text = "Feeback")
 
         # author
-        self.made = Label(self.author, text = "This program was created by: ",\
+        self.authorTxt = Label(self.subAuthorFrame, text = "This program was created by: ",\
                           font = XLARGE_FONT)
-        self.dev = Label(self.author, text="/u/camerongagnon", font = XLARGE_FONT, 
+        self.authorLink = Label(self.subAuthorFrame, text="/u/camerongagnon", font = XLARGE_FONT, 
                          fg=HYPERLINK, cursor = CURSOR)
 
-        # version #
+        # version number
         self.vNum = StringVar()
         self.vNum.set("Version: " + rp.AboutInfo.version() + "." +  AboutInfo.version())
         self.version = Label(self.versionFrame, text = self.vNum.get(), font = XLARGE_FONT)
         
-        # donate
-        self.donateTxt = Label(self.donateFrame, text = "If you enjoy this program, please " 
-                                                        "consider making\na donation to the "
-                                                        "developer at the following PayPal "
-                                                        "link:", font = XLARGE_FONT)
-        self.donateLink = Label(self.donateFrame, text = "here", fg = HYPERLINK,\
+        # donate text/link
+        self.donateTxt = Label(self.donateFrame, text = "If you enjoy this program, "
+                                                        "please consider making a donation ",
+                                                        font = XLARGE_FONT)
+        self.subDonateFrame = Frame(self.donateFrame)
+        self.donateTxt2 = Label(self.subDonateFrame, text = "to the developer at the following "
+                                                            "link,", font = XLARGE_FONT) 
+        self.donateLink = Label(self.subDonateFrame, text = "here.", fg = HYPERLINK,\
                                 font = XLARGE_FONT, cursor = CURSOR)
-        self.feedback = Label(self.feedFrame, text = "To provide comments and/or feedback, please "
+        # feedback
+        self.feedback = Label(self.feedFrame, text = "To provide comments/feedback, please "
                                                      "do one of the following: \n"
                                                      "1. Go to /r/reddit_paper and create a "
                                                      "new post.\n2. Follow the above "
@@ -485,7 +497,7 @@ class About(Frame):
         self.report = Label(self.crashFrame, text = "To send a crash report, please\n"
                             "browse to the file location below and send the log\n"
                             "to cameron.gagnon@gmail.com.", font = XLARGE_FONT)
-        self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get())
+        self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get(), wraplength = 480)
 
 
         
@@ -493,25 +505,28 @@ class About(Frame):
         
         # packs/binds
         # author frame pack
-        self.made.pack(side = "left")
-        self.dev.pack(side = "left")
-        self.dev.bind("<Button-1>", lambda x: self.open_link(AboutInfo.reddit()))
-        self.author.pack(side = "top", pady = (15, 0))
-        # version frame pack
-        self.version.pack(side = "top")
+        self.authorTxt.pack(side = "left", padx = (60, 0))
+        self.authorLink.pack(side = "left", )
+        self.authorLink.bind("<Button-1>", lambda x: self.open_link(AboutInfo.reddit()))
+        self.subAuthorFrame.pack(side = "top")
+        # version frame pack within author frame
+        self.version.pack()
         self.versionFrame.pack(side = "top")
+        self.authorFrame.pack(side = "top", fill = "x", padx = (10, 15))
         # donate frame pack
-        self.donateTxt.pack(side = "top")
-        self.donateLink.pack(side = "top")
+        self.donateTxt.pack(side = "top", padx = (30, 0))
+        self.donateTxt2.pack(side = "left", padx = (30, 0))
+        self.donateLink.pack(side = "left")
         self.donateLink.bind("<Button-1>", lambda x: self.open_link(AboutInfo.PayPal()))
-        self.donateFrame.pack(side = "top", pady = 15)
+        self.donateFrame.pack(side = "top", fill = "x", padx = (10, 15), pady = (10, 0))
+        self.subDonateFrame.pack(side = "top")
         # feedback
         self.feedback.pack(side = "top")
-        self.feedFrame.pack(side = "top", pady = 15)
+        self.feedFrame.pack(side = "top", fill = "x", padx = (10, 15), pady = (10, 0))
         # crash report pack
         self.report.pack(side = "top")
         self.crash_loc.pack(side = "top")
-        self.crashFrame.pack(side = "top", pady = 15)
+        self.crashFrame.pack(side = "top", fill = "x", padx = (10, 15), pady = (10, 0))
         
     def open_link(self, link):
         webbrowser.open_new(link)
@@ -521,6 +536,6 @@ class About(Frame):
         # search for the log file
         return os.path.realpath("CrashReport.log")
 
-
-app = Application()
-app.mainloop()
+if __name__ == "__main__":
+    app = Application()
+    app.mainloop()
