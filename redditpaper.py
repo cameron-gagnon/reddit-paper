@@ -38,6 +38,7 @@ import subprocess
 import logging
 import logging.handlers
 import getpass
+import gui
 from PIL import Image
 from bs4 import BeautifulSoup
 from socket import timeout
@@ -45,10 +46,7 @@ from urllib.error import HTTPError,URLError
 from requests.exceptions import ConnectionError
 
 #sets up global vars
-CREDENTIALS = "user_pass.txt"
-SUBREDDITS = "futureporn+wallpapers+lavaporn+earthporn+imaginarystarscapes+spaceporn"
-USERAGENT = "Reddit wallpaper changer script /u/camerongagnon " \
-            "beta testing"
+USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background picture-uri "\
                "file:///media/cameron/Fresh500/pictures/wallofpapers"\
                                                                 "/reddit/"
@@ -75,6 +73,8 @@ def main():
         # preliminary functions
         Config_logging()
         Parse_cmd_args()
+#env = de.get_desktop_environment()
+
         # checks if a single link was entered by the user to download
         Single_link()
         Create_DB()    
@@ -139,7 +139,8 @@ class Img():
         self.image_name =  url[-(len(url) - remove - 1):]
 
     def setAsWallpaper(self):
-        """ Sets the image as the wallpaper. This is called toward the
+        """ 
+            Sets the image as the wallpaper. This is called toward the
             end of the program, so the image_name, and save location
             should be set.
         """
@@ -147,10 +148,13 @@ class Img():
         try:                            
             subprocess.call(args = SETWALLPAPER + self.image_name, 
                             shell = True)
-            log.debug("Wallpaper should be set to: %s "
-                      "Cycle time: %d seconds",
-                      self.image_name, (CYCLETIME*60))
-                                
+            statusStr = "Wallpaper should be set to: %s for "\
+                        "%d seconds" % (self.image_name, (CYCLETIME*60))
+            log.debug(statusStr)
+#            gui.STATUSBAR.setText(statusStr)
+#TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
+#TO FIX gui.AddButtons.setStatusText(statusStr)
+
         except KeyboardInterrupt:
                 sys.exit(0)
         except:
@@ -162,23 +166,26 @@ class Img():
 ########################################################################
 
 
-class SingleImg():
+class SingleImg(Img):
     """
         Downloads the image from the link manually entered by the user
     """
     def __init__(self, link):
         if link:
+            self.setLink(link)
             self.download(link)
             self.setAsWallpaper()
 
     def download(self, link):
         """ Downloads the image to the save location  """
-        remove = link.rindex('/')                        
-        self.image_name = link[-(len(link) - remove - 1):]
+        self.formatImgName()
+        self.setSaveLoc()
+#remove = link.rindex('/')                        
+#self.image_name = link[-(len(link) - remove - 1):]
 
         # gets the pic download information and sets the download location
         picdl = urllib.request.Request(link, headers = { 'User-Agent': USERAGENT})
-        save_location = DOWNLOADLOCATION + self.image_name
+#save_location = DOWNLOADLOCATION + self.image_name
     
         try:
             picdl = urllib.request.urlopen(picdl)
@@ -192,27 +199,27 @@ class SingleImg():
                  "\n\t\t\t\t\t\t  to: %s",
                  self.link, self.image_name, self.save_location)
         
-        with open(save_location, "wb") as picfile:
+        with open(self.save_location, "wb") as picfile:
             picfile.write(picdl.read())
         
 
-    def setAsWallpaper(self):
-        """ Sets the image entered as the wallpaper """
-
-        try:                            
-            subprocess.call(args = SETWALLPAPER + self.image_name, 
-                            shell = True)
-            log.debug("Wallpaper should be set to: %s", self.image_name)
-                                
-        except KeyboardInterrupt:
-                sys.exit(0)
-        except:
-            log.exception("Error setting wallpaper, it is likely the "
-                          "file path is not 100% correct. Make sure "
-                          "there is a foward slash at the end of the "
-                          "path in the SETWALLPAPER variable.",
-                          exc_info = True)
-            sys.exit(1)
+#    def setAsWallpaper(self):
+#        """ Sets the image entered as the wallpaper """
+#
+#        try:                            
+#            subprocess.call(args = SETWALLPAPER + self.image_name, 
+#                            shell = True)
+#            log.debug("Wallpaper should be set to: %s", self.image_name)
+#                                
+#        except KeyboardInterrupt:
+#                sys.exit(0)
+#        except:
+#            log.exception("Error setting wallpaper, it is likely the "
+#                          "file path is not 100% correct. Make sure "
+#                          "there is a foward slash at the end of the "
+#                          "path in the SETWALLPAPER variable.",
+#                          exc_info = True)
+#            sys.exit(1)
 ########################################################################
 
 
@@ -291,7 +298,7 @@ def Config_logging():
     # configures logging to console
     # set console logger
     console = logging.StreamHandler()
-    console.setLevel(logging.ERROR) #toggle console level output with this line
+    console.setLevel(logging.DEBUG) #toggle console level output with this line
     
     # set format for console logger
     consoleFormat = logging.Formatter('%(levelname)-6s %(message)s')
@@ -333,41 +340,6 @@ def Login():
     
     Connected("https://www.reddit.com/.json")
     r = praw.Reddit(user_agent = USERAGENT)
-
-   
-    tries = 3
-    login = False
-    while(tries and not login):
-        # check if the username/password is in the database
-        cur.execute('SELECT Username, Password FROM userpass')
-        if cur.fetchone() is None:
-
-            USERNAME = input("Please enter your Reddit username: ")
-            PASSWORD = getpass.getpass("Please enter your password: ")
-            cur.execute('INSERT INTO userpass Values(?, ?)', 
-                        [USERNAME, PASSWORD])
-            sql.commit()
-        
-        try:
-            cur.execute('SELECT Username, Password FROM userpass')
-            USERNAME, PASSWORD = cur.fetchone()
-            r.login(USERNAME, PASSWORD)
-            login = True
-
-        except praw.errors.InvalidUserPass:
-            print("Incorrect Username/Password.", tries)
-            cur.execute('DELETE from userpass')
-            sql.commit()
-            tries -= 1
-
-    # check if we attempted entering user/pass too many times
-    if tries == 0:
-        print("Too many invalid tries. Exiting...")
-        sys.exit(0)
-    
-    cur.execute('INSERT INTO userpass Values(?, ?)',
-                [USERNAME, PASSWORD])
-    log.info("Logging in as %s ...", USERNAME)
     return r
 
 ####################################################################
@@ -385,10 +357,6 @@ def Create_DB():
     cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                  ImgName TEXT, ImgTitle TEXT, ImgLink TEXT,\
                  Width INT, Height INT)')
-
-    # create Username and Password database
-    cur.execute('CREATE TABLE IF NOT EXISTS userpass(Username TEXT,\
-                Password TEXT)')
 
     # commit dem changes yo
     sql.commit()
@@ -526,6 +494,8 @@ def Deviant_parse(url, regex):
         sys.exit(0)
     except (IndexError, TypeError):
         log.debug("No links found in Deviant_parse")
+
+        return False, False
 
     # this exception is when the good img url to download is
     # passed in. Since this url when opened is not html, it throws
@@ -851,7 +821,7 @@ def Download_img(url, im):
     
     with open(im.save_location, "wb") as picfile:
         picfile.write(picdl.read())
-        image_list.append(im.image_name)
+#        image_list.append(im)
     
     return True
 ####################################################################
@@ -887,14 +857,27 @@ def Main_photo_controller(r):
                         
         else:
             im.setImgName(image_name)
-
+            # if it's already downloaded, we can just check width/height
             if not Already_downloaded(im):
+
+                # if it's not already downloaded, we must check the title
+                # for width and height, and then attempt a download. If
+                # the width/height is present and in range, and the 
+                # download is good, we can set the image as the background
                 if  Valid_width_height(im) and Download_img(url, im):
+
+                    image_list.append(im)
                     log.debug("Image successfully downloaded with"
                               " WxH in title")
-
-                elif is_deviant and Download_img(url, im) and \
-                     PIL_width_height(im.image_name):
+                # if it's not a good width because it's too small or we
+                # couldn't find the title, then we check if we can download the
+                # image and if that succeeds, then we check the width/height
+                # If all these return true we can append the img to the list of
+                # images to set
+                elif is_deviant and Download_img(url, im) and\
+                        PIL_width_height(im.image_name):
+                    
+                    image_list.append(im)
                     # specifically for subs w/o WxH in title, but still
                     # have images to download (e.x. imaginarystarscapes)
                     log.debug("Image successfully downloaded WITHOUT"
@@ -904,20 +887,15 @@ def Main_photo_controller(r):
             elif not Check_width_height(im.id):
                 MAXPOSTS -= 1 
             else:
-                #Append the pic if already downloaded so
-                #when Cycle_wallpaper is called, it will
-                #still use the current MAXPOSTS posts on
-                #Reddit.
-        
-                #The reason for this is if a search is
-                #cancelled before all images are
-                #downloaded, then some images will be
-                #available but we do not want to download
-                #them again. Thus they will not be added
-                #to the current image_list until this
-                #statement takes place.
+                # The reason for this is if a search is
+                # cancelled before all images are
+                # downloaded, then some images will be
+                # available but we do not want to download
+                # them again. Thus they will not be added
+                # to the current image_list until this
+                # statement takes place.
                 
-                image_list.append(im.image_name)
+                image_list.append(im)
         i += 1
     log.debug("Exiting Main_photo_controller fn")
 
@@ -939,9 +917,10 @@ def Set_wallpaper(image_name):
             sys.exit(0)
     except:
         log.exception("Error setting wallpaper, it is likely the "
-              "file path is not 100% correct. Make sure "
-              "there is a foward slash at the end of the "
-              "path in the SETWALLPAPER variable.", exc_info=True)
+                      "file path is not 100% correct. Make sure "
+                      "there is a foward slash at the end of the "
+                      "path in the SETWALLPAPER variable.",
+                      exc_info=True)
         sys.exit(1)
 
 ###################################################################
@@ -954,8 +933,10 @@ def Cycle_wallpaper():
     
     log.debug("MAXPOSTS is: %s", MAXPOSTS)
     try: 
-        for i in range(0, MAXPOSTS, 1):
-            Set_wallpaper(image_list[i])
+        print(image_list)
+        for im in image_list:
+            print(im)
+            im.setAsWallpaper()
             time.sleep(CYCLETIME*60)
     except IndexError:
         log.error("No posts appear to be in the specific "\
@@ -974,7 +955,7 @@ def Parse_cmd_args():
     global CATEGORY
     global URL
     global SINGLELINK
-
+    global SUBREDDITS
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.")
@@ -991,10 +972,16 @@ def Parse_cmd_args():
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper", default = .05)
     parser.add_argument("-c", "--category", type = str,
-                        help="Ex. hot, new, rising, top", default = "hot")
+                        help="Options: hot, new, rising, top", default = "hot")
     parser.add_argument("-l", "--link", type = str,
                         help="Provide a direct image link to download"
                              " just the specified link", default = None) 
+    parser.add_argument("-s", "--subreddits", type = str,
+                        help="Enter a list of mostly image subreddits "
+                             "separated by the plus (+) character, to "
+                             "pull the top images from those subreddits",
+                        default = "futureporn+wallpapers+lavaporn+"\
+                                  "earthporn+imaginarystarscapes+spaceporn")
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
@@ -1003,6 +990,7 @@ def Parse_cmd_args():
     CYCLETIME = float(args.cycletime)
     CATEGORY = str(args.category)
     SINGLELINK = args.link
+    SUBREDDITS = str(args.subreddits)
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
 
 ###################################################################
