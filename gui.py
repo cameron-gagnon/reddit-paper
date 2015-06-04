@@ -419,7 +419,7 @@ class Settings(Frame):
         self.nsfwOff = StringVar()
         self.nsfwOff.set("Off")
         # nsfw var config
-        self.onOff = IntVar()
+        self.onOff = BooleanVar() #IntVar()
 
         # nsfw checkbutton config
         self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),\
@@ -454,11 +454,9 @@ class Settings(Frame):
         self.values = {}
         self.values['-mw'] = self.minwidth.get()
         self.values['-mh'] = self.minheight.get()
-        self.values['-nsfw'] = self.onOff.get()
+        self.values['--nsfw'] = self.onOff.get()
         self.values['-s'] = self.subreddits.get()
 #self.values['-t'] = self.cycletime.get()
-
-#rp.log.debug("Values at runtime are: " + self.values)
         return self.values 
 
     
@@ -475,9 +473,8 @@ class Settings(Frame):
         # if so, remove them from the list
         self.argList = os.getcwd() + "/redditpaper.py"
         for k, v in self.args.items():
-#rp.log.debug("Key in CLArgs is: " + k + " and Value "
-#                         "is: " + v)
-            print(k, v)
+            rp.log.debug("Key, Value in CLArgs is: "
+                         + k + " " + str(v))
             if v:
                 # add key and value to the string to be
                 # passed as cmd line args
@@ -485,9 +482,9 @@ class Settings(Frame):
                 self.argList += " " + k + " " + str(v)
 
         # call main function with cmd line args
-#rp.log.debug("Argument list is: " + argList)
-
+        rp.log.debug("Argument list is: " + self.argList)
         subprocess.Popen(self.argList.split())
+
 
 # **** About Page **** #
 # Displays information regarding the creator of the application,
@@ -604,5 +601,6 @@ class About(Frame):
         return os.path.realpath("CrashReport.log")
 
 if __name__ == "__main__":
+    rp.Config_logging()
     app = Application()
     app.mainloop()
