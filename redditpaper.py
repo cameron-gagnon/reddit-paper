@@ -115,6 +115,7 @@ class Img():
         self.setTitle(post.title)
         self.setLink(post.url)
         self.setID(post.id)
+        self.setNSFW(post.over_18)
 
     def setImgName(self, image_name):
         self.image_name = image_name
@@ -129,6 +130,9 @@ class Img():
     def setID(self, id):
         self.id = id
 
+    def setNSFW(self, nsfw):
+        self.nsfw = nsfw
+    
     def setSaveLoc(self):
         self.save_location = DOWNLOADLOCATION + str(self.image_name)
 
@@ -854,6 +858,9 @@ def Main_photo_controller(r):
 
         if (not image_name or not url):
             MAXPOSTS -= 1
+
+        elif (NSFW and im.nsfw):
+            MAXPOSTS -= 1
                         
         else:
             im.setImgName(image_name)
@@ -956,6 +963,8 @@ def Parse_cmd_args():
     global URL
     global SINGLELINK
     global SUBREDDITS
+    global NSFW
+
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.")
@@ -982,6 +991,9 @@ def Parse_cmd_args():
                              "pull the top images from those subreddits",
                         default = "futureporn+wallpapers+lavaporn+"\
                                   "earthporn+imaginarystarscapes+spaceporn")
+    parser.add_argument("--nsfw", type = str,
+                        help="--nsfw True will filter out NSFW images, and "
+                             "vice versa", default = False)
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
@@ -990,7 +1002,8 @@ def Parse_cmd_args():
     CYCLETIME = float(args.cycletime)
     CATEGORY = str(args.category)
     SINGLELINK = args.link
-    SUBREDDITS = str(args.subreddits)
+    SUBREDDITS = args.subreddits
+    NSFW = args.nsfw
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
 
 ###################################################################
