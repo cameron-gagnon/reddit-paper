@@ -45,7 +45,7 @@ from bs4 import BeautifulSoup
 from socket import timeout
 from urllib.error import HTTPError,URLError
 from requests.exceptions import ConnectionError
-
+from collections import OrderedDict
 #sets up global vars
 USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
 SETWALLPAPER = "gsettings set org.gnome.desktop.background picture-uri "\
@@ -73,8 +73,8 @@ def main():
     try:
         # preliminary functions
         Config_logging()
-        Parse_cmd_args()
-        Config.read_config()
+        args = Parse_cmd_args()
+        config = Config.config(args)
 #env = de.get_desktop_environment()
         
         # checks if a single link was entered by the user to download
@@ -299,50 +299,94 @@ class Database():
                     [im.id, im.image_name, im.title, im.link, width, height])
         sql.commit()
 
+
+###########################################################################
 class Config():
-            
-    def config():
+    """
+        Values used to initiate the settings file.
+    """
+    default_values = {'DOWNLOADLOCATION': os.getcwd(),
+                      'MINWIDTH': 1024,
+                      'MINHEIGHT': 768,
+                      'SUBREDDITS': "futureporn+earthporn+"
+                                    "technologyporn+spaceporn"
+                                    "imaginarystarscapes+lavaporn",
+                      'CATEGORY': "hot",
+                      'CYCLETIME': 0.05,
+                      'MAXPOSTS': 5,
+                      'NSFW': False
+                     }
+    
+    
+    def config(args):
         """
-            Sets up a config file in local directory
-            for storing setting values.
+            Updates/creates the config file with the default/new values
+            determined by the dict that is passed in
         """
-        
         config = configparser.ConfigParser()
-        config['Save Location'] = OrderedDict([('Directory', DOWNLOADLOCATION)])
-        config['Options'] = OrderedDict([('Minwidth', MINWIDTH),
-                                         ('Minheight', MINHEIGHT),
-                                         ('Subreddits', SUBREDDITS),
-                                         ('Category', CATEGORY),
-                                         ('Cycletime', CYCLETIME)])
-        config['Max posts to check'] = OrderedDict([('Max posts', MAXPOSTS)])
-        config['Adult Content'] = OrderedDict([('NSFW', NSFW)])
-        with open(os.cwd() + '/settings.conf', 'w') as configfile:
+        config['Save Location'] = OrderedDict([('Directory', args['DOWNLOADLOCATION'])])
+        config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
+                                         ('Minheight', args['MINHEIGHT']),
+                                         ('Subreddits', args['SUBREDDITS']),
+                                         ('Category', args['CATEGORY']),
+                                         ('Cycletime', args['CYCLETIME'])])
+        config['Max posts to check'] = OrderedDict([('Max posts', args['MAXPOSTS'])])
+        config['Adult Content'] = OrderedDict([('NSFW', args['NSFW'])])
+        
+        with open('settings.conf', 'w') as configfile:
             config.write(configfile)
 
-    def read_config():
+   
+   
+    def file_found():
+        """
+            Returns true if the file exists, otherwise it returns false
+        """
         config = configparser.ConfigParser()
-        # config the file if not already available
-        if config.read('/settings.conf') is False:
-            Config.config()
-        
-        config.read('/settings.conf')
+        if config.read("settings.conf") == []:
+            log.debug("Settings.conf does not exist.")
+            return False
+        else:
+            log.debug("Settings.conf exists.")
+            return True
 
-        SUBREDDITS = config.get('Options', 'Subreddits',
+
+    def read_config():
+        """
+            Reads the values from the config file and also will call config if
+            a new file needs to be created. With the read in values, it passes
+            them to parse_cmd_args() to set as default values, since that is
+            the point of the config file.
+        """
+        config = configparser.ConfigParser()
+        global URL
+        
+        # create default config file if not created
+        if not Config.file_found():
+            log.debug("Creating configuration file")
+            Config.config(Config.default_values)
+
+        config.read('settings.conf')
+        args = {} 
+        args['SUBREDDITS'] = config.get('Options', 'Subreddits',
                                 fallback = "futureporn+wallpapers+lavaporn+"
                                   "earthporn+imaginarystarscapes+spaceporn")
-        MINWIDTH = config.getint('Options', 'Minwidth', fallback = 1024)
-        MINHEIGHT = config.getint('Options', 'Minheight', fallback = 768)
-        MAXPOSTS = config.getint('Max posts to check', 'Max posts',
+        args['MINWIDTH'] = config.getint('Options', 'Minwidth', fallback = 1024)
+        print(args['MINWIDTH'])
+        args['MINHEIGHT'] = config.getint('Options', 'Minheight', fallback = 768)
+        args['MAXPOSTS'] = config.getint('Max posts to check', 'Max posts',
                                  fallback = 5)
-        CYCLETIME = config.getint('Options', 'Cycletime', fallback = .05)
-        CATEGORY = config.get('Options', 'Minwidth', fallback = "hot")
-        NSFW = config.getint('Adult Content', 'NSFW', fallback = False)
-        DOWNLOADLOCATION = config.get('Save Location', 'Directory',
+        args['CYCLETIME'] = config.getfloat('Options', 'Cycletime', fallback = .05)
+        args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
+        args['NSFW'] = config.getboolean('Adult Content', 'NSFW', fallback = False)
+        args['DOWNLOADLOCATION'] = config.get('Save Location', 'Directory',
                                       fallback = os.getcwd())
- 
+        URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + args['CATEGORY'] + "/"
+        return args
+
 
 ####################################################################
-### METHOD IMPLEMENTATIONS
+### FUNCTION IMPLEMENTATIONS
 ####################################################################
 
 ###################################################################
@@ -988,57 +1032,70 @@ def Parse_cmd_args():
     global SUBREDDITS
     global NSFW
 
+    default = Config.read_config()
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.", prog="redditpaper.py")
     parser.add_argument("-mw", "--minwidth", type = int,
                         help="Minimum width of picture required "
-                             "to download", default = 1024)
+                             "to download",
+                        default = default['MINWIDTH'])
     parser.add_argument("-mh", "--minheight", type = int,
                         help="Minimum height of picture required "
-                             "to download", default = 768)
+                             "to download",
+                        default = default['MINHEIGHT'])
     parser.add_argument("-mp", "--maxposts", type = int,
                         help="Amount of images to check and "
-                             "download", default = 5)
+                             "download",
+                        default = default['MAXPOSTS'])
     parser.add_argument("-t", "--cycletime", type = float,
                         help="Amount of time (in minutes) each image "
-                             "will be set as wallpaper", default = .05)
+                             "will be set as wallpaper",
+                        default = default['CYCLETIME'])
     parser.add_argument("-c", "--category", type = str,
                         choices = ['hot', 'new', 'rising', 'controversial',\
                                    'top'],
-                        help="Options: hot, new, rising, top", default = "hot")
-    parser.add_argument("-l", "--link", type = str,
+                        default = default['CATEGORY'],
+                        help="Options: hot, new, rising, top")
+    parser.add_argument("-l", "--link", type = str, default = None,
                         help="Provide a direct image link to download"
-                             " just the specified link", default = None) 
+                             " just the specified link") 
     parser.add_argument("-s", "--subreddits", type = str,
                         help="Enter a list of mostly image subreddits "
-   
                              "pull the top images from those subreddits",
-                        default = "futureporn+wallpapers+lavaporn+"
-                                  "earthporn+imaginarystarscapes+spaceporn")
+                        default = default['SUBREDDITS'])
     parser.add_argument("--nsfw", type = convert_nsfw, 
-                        choices = [0, 1],
+                        choices = [0, 1], default = default['NSFW'],
                         help="--nsfw True will filter out NSFW images, and "
-                             "vice versa", default = False)
+                             "vice versa")
     parser.add_argument("-dl", "--downloadLoc", type = str,
                         help="Set the file location where the pictures "
                              "will be downloaded to. EX. "
                              "C:\\Users\\USERNAME\\pictures\\. Be sure to "
                              "include the last forward/backward slash.",
-                        default = os.getcwd())
+                        default = default['DOWNLOADLOCATION'])
     args = parser.parse_args()
-    
-    MINWIDTH = int(args.minwidth)
-    MINHEIGHT = int(args.minheight)
-    MAXPOSTS = abs(int(args.maxposts))
-    CYCLETIME = float(args.cycletime)
-    CATEGORY = args.category
+    a = {}
+    a['MINWIDTH'] = args.minwidth
+    a['MINHEIGHT'] = args.minheight
+    a['MAXPOSTS'] = args.maxposts
+    a['CYCLETIME'] = args.cycletime
+    a['CATEGORY'] = args.category
     SINGLELINK = args.link
-    SUBREDDITS = args.subreddits
-    NSFW = args.nsfw
-    DOWNLOADLOCATION = args.downloadLoc
-    URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
-
+    a['SUBREDDITS'] = args.subreddits
+    a['NSFW'] = args.nsfw
+    a['DOWNLOADLOCATION'] = args.downloadLoc
+    
+    # must declare as global so rest of program can see the values
+    MINWIDTH  =  a['MINWIDTH'] 
+    MINHEIGHT =  a['MINHEIGHT']
+    MAXPOSTS  =  a['MAXPOSTS'] 
+    CYCLETIME =  a['CYCLETIME']
+    CATEGORY  =  a['CATEGORY'] 
+    SUBREDDITS=  a['SUBREDDITS']
+    NSFW      =  a['NSFW']
+    DOWNLOADLOCATION = a['DOWNLOADLOCATION'] 
+    return a
 def convert_nsfw(nsfw):
     # converts nsfw value from T/F to 1/0
     if nsfw == "True":
