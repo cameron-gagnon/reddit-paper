@@ -27,6 +27,7 @@ import praw
 import sqlite3
 import pprint
 import argparse
+import configparser
 import json
 import os
 import subprocess
@@ -73,13 +74,14 @@ def main():
         # preliminary functions
         Config_logging()
         Parse_cmd_args()
+        Config.read_config()
 #env = de.get_desktop_environment()
-
+        
         # checks if a single link was entered by the user to download
         Single_link()
-        Create_DB()    
+        db = Database()    
         
-        r = Login()
+        r = Connected("https://www.reddit.com/.json")
         # this is the main function that will download and parse
         # the images
         Main_photo_controller(r)
@@ -155,7 +157,7 @@ class Img():
             statusStr = "Wallpaper should be set to: %s for "\
                         "%d seconds" % (self.image_name, (CYCLETIME*60))
             log.debug(statusStr)
-#            gui.STATUSBAR.setText(statusStr)
+#gui.STATUSBAR.setText(statusStr)
 #TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
 #TO FIX gui.AddButtons.setStatusText(statusStr)
 
@@ -184,12 +186,9 @@ class SingleImg(Img):
         """ Downloads the image to the save location  """
         self.formatImgName()
         self.setSaveLoc()
-#remove = link.rindex('/')                        
-#self.image_name = link[-(len(link) - remove - 1):]
 
         # gets the pic download information and sets the download location
         picdl = urllib.request.Request(link, headers = { 'User-Agent': USERAGENT})
-#save_location = DOWNLOADLOCATION + self.image_name
     
         try:
             picdl = urllib.request.urlopen(picdl)
@@ -206,25 +205,7 @@ class SingleImg(Img):
         with open(self.save_location, "wb") as picfile:
             picfile.write(picdl.read())
         
-
-#    def setAsWallpaper(self):
-#        """ Sets the image entered as the wallpaper """
-#
-#        try:                            
-#            subprocess.call(args = SETWALLPAPER + self.image_name, 
-#                            shell = True)
-#            log.debug("Wallpaper should be set to: %s", self.image_name)
-#                                
-#        except KeyboardInterrupt:
-#                sys.exit(0)
-#        except:
-#            log.exception("Error setting wallpaper, it is likely the "
-#                          "file path is not 100% correct. Make sure "
-#                          "there is a foward slash at the end of the "
-#                          "path in the SETWALLPAPER variable.",
-#                          exc_info = True)
-#            sys.exit(1)
-########################################################################
+#######################################################################
 
 
 class DBImg():
@@ -274,11 +255,97 @@ class AboutInfo():
     def version():
         return AboutInfo._version
 
+########################################################################
+
+class Database():
+
+    def __init__(self): #Create_DB()
+        global sql
+        global cur
+           
+        log.info("Accessing database for submission ID's")
+        sql, cur = self.connect_to_DB() 
+        # create image database
+        cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
+                     ImgName TEXT, ImgTitle TEXT, ImgLink TEXT,\
+                     Width INT, Height INT)')
+    
+        # create settings database for user settings from gui
+        cur.execute('CREATE TABLE IF NOT EXISTS settings(mw INT,\
+                     mh INT, ct INT, subreddits TEXT, nsfw INT,\
+                     dl TEXT)')
+        # commit dem changes yo
+        sql.commit()
+
+
+    # connects to the wallpaper.db which holds the image info
+    def connect_to_DB(self):
+        sql = sqlite3.connect('wallpaper.db')
+        cur = sql.cursor()
+        return sql, cur
+
+    
+    #REQUIRES id of submission to insert
+    #MODIFIES database of id's already downloaded
+    #EFFECTS  Inserts the submission id into the database after a 
+    #         successful download
+    def Insert_ImgDB(im, width, height):
+        log.debug("Data to insert\n\t\t\t\t\t\t  id: %s"\
+                 "\n\t\t\t\t\t\t  image_name: %s"\
+                 "\n\t\t\t\t\t\t  width: %s"\
+                 "\n\t\t\t\t\t\t  height: %s",
+                 im.id, im.image_name, width, height) 
+        cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?)',\
+                    [im.id, im.image_name, im.title, im.link, width, height])
+        sql.commit()
+
+class Config():
+            
+    def config():
+        """
+            Sets up a config file in local directory
+            for storing setting values.
+        """
+        
+        config = configparser.ConfigParser()
+        config['Save Location'] = OrderedDict([('Directory', DOWNLOADLOCATION)])
+        config['Options'] = OrderedDict([('Minwidth', MINWIDTH),
+                                         ('Minheight', MINHEIGHT),
+                                         ('Subreddits', SUBREDDITS),
+                                         ('Category', CATEGORY),
+                                         ('Cycletime', CYCLETIME)])
+        config['Max posts to check'] = OrderedDict([('Max posts', MAXPOSTS)])
+        config['Adult Content'] = OrderedDict([('NSFW', NSFW)])
+        with open(os.cwd() + '/settings.conf', 'w') as configfile:
+            config.write(configfile)
+
+    def read_config():
+        config = configparser.ConfigParser()
+        # config the file if not already available
+        if config.read('/settings.conf') is False:
+            Config.config()
+        
+        config.read('/settings.conf')
+
+        SUBREDDITS = config.get('Options', 'Subreddits',
+                                fallback = "futureporn+wallpapers+lavaporn+"
+                                  "earthporn+imaginarystarscapes+spaceporn")
+        MINWIDTH = config.getint('Options', 'Minwidth', fallback = 1024)
+        MINHEIGHT = config.getint('Options', 'Minheight', fallback = 768)
+        MAXPOSTS = config.getint('Max posts to check', 'Max posts',
+                                 fallback = 5)
+        CYCLETIME = config.getint('Options', 'Cycletime', fallback = .05)
+        CATEGORY = config.get('Options', 'Minwidth', fallback = "hot")
+        NSFW = config.getint('Adult Content', 'NSFW', fallback = False)
+        DOWNLOADLOCATION = config.get('Save Location', 'Directory',
+                                      fallback = os.getcwd())
+ 
 
 ####################################################################
 ### METHOD IMPLEMENTATIONS
 ####################################################################
 
+###################################################################
 def Config_logging():
     """ Configures the logging to external file """
     global log
@@ -318,6 +385,7 @@ def Config_logging():
 #EFFECTS  returns true if able to connect to specified url, returns
 #         false if not able to connect, or timesout
 def Connected(url):
+    r = praw.Reddit(user_agent = USERAGENT)
     try:
         uaurl = urllib.request.Request(url,
                  headers={'User-Agent' : USERAGENT})
@@ -335,36 +403,7 @@ def Connected(url):
                   " connection is stable, and then try again.")
         sys.exit(0)
 
-####################################################################
-#REQUIRES valid USERNAME, PASSWORD
-#MODIFIES connection to reddit
-#EFFECTS  Attempts to login to Reddit using the provided username
-#         and password.
-def Login():
-    
-    Connected("https://www.reddit.com/.json")
-    r = praw.Reddit(user_agent = USERAGENT)
     return r
-
-####################################################################
-
-def Create_DB():
-    global sql
-    global cur
-
-    sql = sqlite3.connect('wallpaper.db')
-    cur = sql.cursor()
-    
-    log.info("Accessing database for submission ID's")
-    
-    # create image database
-    cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
-                 ImgName TEXT, ImgTitle TEXT, ImgLink TEXT,\
-                 Width INT, Height INT)')
-
-    # commit dem changes yo
-    sql.commit()
-
 ####################################################################
 #MODIFIES Downloads the image specified by the user 
 #EFFECTS  Sets image as wallpaper
@@ -688,21 +727,6 @@ def Already_downloaded(im):
         return False            
 
 ####################################################################
-#REQUIRES id of submission to insert
-#MODIFIES database of id's already downloaded
-#EFFECTS  Inserts the submission id into the database after a 
-#         successful download
-def Insert_to_db(im, width, height):
-    log.info("Data to insert\n\t\t\t\t\t\t  id: %s"\
-             "\n\t\t\t\t\t\t  image_name: %s"\
-             "\n\t\t\t\t\t\t  width: %s"\
-             "\n\t\t\t\t\t\t  height: %s",
-             im.id, im.image_name, width, height) 
-    cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?)',\
-                [im.id, im.image_name, im.title, im.link, width, height])
-    sql.commit()
-
-####################################################################
 #REQUIRES Full title of post which may have the reslotuion of the
 #         image
 #MODIFIES nothing
@@ -721,7 +745,7 @@ def Valid_width_height(im):
         
         log.debug("Width: %s \n\t\t\t\t\t\t  Height: %s", result1, result2)
         
-        Insert_to_db(im, result1, result2)         
+        Database.Insert_ImgDB(im, result1, result2)         
         return Lookup_width_height(im)
 
     except IndexError:
@@ -938,11 +962,10 @@ def Set_wallpaper(image_name):
 def Cycle_wallpaper():
     global image_list
     
-    log.debug("MAXPOSTS is: %s", MAXPOSTS)
+    log.debug("NUM OF IMAGES IS: %s", len(image_list))
     try: 
-        print(image_list)
+        log.debug(image_list)
         for im in image_list:
-            print(im)
             im.setAsWallpaper()
             time.sleep(CYCLETIME*60)
     except IndexError:
@@ -967,7 +990,7 @@ def Parse_cmd_args():
 
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
-            " them as the wallpaper.")
+            " them as the wallpaper.", prog="redditpaper.py")
     parser.add_argument("-mw", "--minwidth", type = int,
                         help="Minimum width of picture required "
                              "to download", default = 1024)
@@ -981,30 +1004,51 @@ def Parse_cmd_args():
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper", default = .05)
     parser.add_argument("-c", "--category", type = str,
+                        choices = ['hot', 'new', 'rising', 'controversial',\
+                                   'top'],
                         help="Options: hot, new, rising, top", default = "hot")
     parser.add_argument("-l", "--link", type = str,
                         help="Provide a direct image link to download"
                              " just the specified link", default = None) 
     parser.add_argument("-s", "--subreddits", type = str,
                         help="Enter a list of mostly image subreddits "
-                             "separated by the plus (+) character, to "
+   
                              "pull the top images from those subreddits",
-                        default = "futureporn+wallpapers+lavaporn+"\
+                        default = "futureporn+wallpapers+lavaporn+"
                                   "earthporn+imaginarystarscapes+spaceporn")
-    parser.add_argument("--nsfw", type = str,
+    parser.add_argument("--nsfw", type = convert_nsfw, 
+                        choices = [0, 1],
                         help="--nsfw True will filter out NSFW images, and "
                              "vice versa", default = False)
+    parser.add_argument("-dl", "--downloadLoc", type = str,
+                        help="Set the file location where the pictures "
+                             "will be downloaded to. EX. "
+                             "C:\\Users\\USERNAME\\pictures\\. Be sure to "
+                             "include the last forward/backward slash.",
+                        default = os.getcwd())
     args = parser.parse_args()
     
     MINWIDTH = int(args.minwidth)
     MINHEIGHT = int(args.minheight)
     MAXPOSTS = abs(int(args.maxposts))
     CYCLETIME = float(args.cycletime)
-    CATEGORY = str(args.category)
+    CATEGORY = args.category
     SINGLELINK = args.link
     SUBREDDITS = args.subreddits
     NSFW = args.nsfw
+    DOWNLOADLOCATION = args.downloadLoc
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
+
+def convert_nsfw(nsfw):
+    # converts nsfw value from T/F to 1/0
+    if nsfw == "True":
+        nsfw = 1
+    elif nsfw == "False":
+        nsfw = 0
+    else:
+        log.error("Enter valid nsfw value")
+        sys.exit(1)
+    return nsfw
 
 ###################################################################
 if __name__ == '__main__':
