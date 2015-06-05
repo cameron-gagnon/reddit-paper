@@ -36,7 +36,7 @@ class Application(Tk):
         
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
-        
+#        self.STATUSBAR = StatusBar(root)
         self.frames = {}
         
         # window used to pack the pages into
@@ -146,7 +146,7 @@ class Messages():
         # places popup onscreen
         popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
 
-
+# put in class
 def setUnderline(self):
     """
         Gives the ability to have entire strings of text
@@ -163,7 +163,7 @@ def setUnderline(self):
 
 class StatusBar(Frame):
 
-    def __init__(self, master):
+    def __init__(self, master): 
         # statusbar for bottom of application        
         self.statusBar = Label(master, text = "asdf", bd=1,
                           relief = SUNKEN, anchor = "w")
@@ -171,8 +171,8 @@ class StatusBar(Frame):
         # pack the labels/frame to window
         self.statusBar.pack(side = "bottom", fill = "x", anchor = "w")
 
-    def setText(text):
-        print(text)
+    def setText(self, text):
+        rp.log.debug("Setting STATUSBAR text to: " + text)
         self.statusBar.config(text = text)
 
 
@@ -211,9 +211,8 @@ class AddButtons(Frame):
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
 
-        STATUSBAR = StatusBar(master)
+#        STATUSBAR = StatusBar(master)
         self.topbar.pack(side = "top")
-
 
 
 # **** Current Image Page **** #
@@ -370,23 +369,34 @@ class Settings(Frame):
         label = Label(self, text="Settings", font = LARGE_FONT, bg="yellow")
         label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
+        # subreddit border
         self.subredditForm = LabelFrame(self, text = "Subreddits")
+        # nsfw border
         self.checks = LabelFrame(self.top, text = "Adult Content")
+        # width x height
         self.dimensions = LabelFrame(self.top, 
                                      text = "Minimum Picture Resolution")
         self.res = Frame(self.dimensions)
-        
+        # download location border
+        self.dlFrame = LabelFrame(self, text = "Picture download location")
+                
         # Buttons
         self.letsGo = Button(self, text = "Let's Go!")
       
         # subreddit entry
         subtxt = Label(self.subredditForm, text = "Subreddits (separated by +)",
                        pady = 15)
-        subtxt.grid(row = 2, columnspan = 2, ipadx = 5, sticky = "w")
+        subtxt.grid(row = 1, columnspan = 2, ipadx = 5, sticky = "w")
         self.subreddits = Entry(self.subredditForm, width = 29)
-        self.subreddits.grid(row = 2, column = 2, columnspan = 2, padx = (0,10),
+        self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = (0,10),
                              sticky = "w")
-        
+        # "download to" entry
+        self.dlTxt = Label(self.dlFrame, text = "Download pictures to:", 
+                           pady = 15)
+        self.dlTxt.grid(row = 0, column = 0, ipadx = 5, sticky = "w")
+        self.dlLoc = Entry(self.dlFrame, width = 30)
+        self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = (0, 10))
+
         # Frames for width x height
         self.widthF = Frame(self.res)
         self.heightF = Frame(self.res)
@@ -395,7 +405,7 @@ class Settings(Frame):
 
         # Min width
         minWidthTxt = Label(self.widthF, text = " Min-width:")
-        minWidthTxt.grid(row = 0, column = 0, sticky = "e", pady = (10, 6))
+        minWidthTxt.grid(row = 0, column = 0, sticky = "e", pady = (10, 0))
         # min width entry
         self.minwidth = Entry(self.widthF, width = 6)
         self.minwidth.grid(row = 0, column = 1, padx = (5, 5))
@@ -432,9 +442,11 @@ class Settings(Frame):
         self.nsfw.pack(side = "left", anchor = "w", pady = 10,\
                        padx = (15, 10))
         # top holds dimensions and user/pass labelFrames
-        self.top.pack(side = "top", anchor = "w", pady = 5)
+        self.top.pack(side = "top", anchor = "w", pady = (5,0))
         self.subredditForm.pack(side = "top", anchor = "w",\
                                 padx = (15, 10))
+        self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
+                          padx = (15, 10))
         self.dimensions.pack(side = "left", anchor = "w", pady = 10,\
                              padx = (15, 10))
         self.res.pack(side = "top")
@@ -456,6 +468,7 @@ class Settings(Frame):
         self.values['-mh'] = self.minheight.get()
         self.values['--nsfw'] = self.onOff.get()
         self.values['-s'] = self.subreddits.get()
+        self.values['-dl'] = self.dlLoc.get()
 #self.values['-t'] = self.cycletime.get()
         return self.values 
 
@@ -470,7 +483,7 @@ class Settings(Frame):
 
         self.args = self.get_values()
         # check if any values are null/empty
-        # if so, remove them from the list
+        # if so, don't add them to the list 
         self.argList = os.getcwd() + "/redditpaper.py"
         for k, v in self.args.items():
             rp.log.debug("Key, Value in CLArgs is: "
