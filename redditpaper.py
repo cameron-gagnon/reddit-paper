@@ -312,7 +312,7 @@ class Config():
                                     "technologyporn+spaceporn"
                                     "imaginarystarscapes+lavaporn",
                       'CATEGORY': "hot",
-                      'CYCLETIME': 0.05,
+                      'CYCLETIME' : 0.05,
                       'MAXPOSTS': 5,
                       'NSFW': False
                      }
@@ -323,21 +323,33 @@ class Config():
             Updates/creates the config file with the default/new values
             determined by the dict that is passed in
         """
+        # split up the jumble of time to set the hr and min correctly
+        args['CYCLEHR'], args['CYCLEMIN'] = Config.set_time(args['CYCLETIME'])
+
         config = configparser.ConfigParser()
         config['Save Location'] = OrderedDict([('Directory', args['DOWNLOADLOCATION'])])
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
                                          ('Minheight', args['MINHEIGHT']),
                                          ('Subreddits', args['SUBREDDITS']),
-                                         ('Category', args['CATEGORY']),
-                                         ('Cycletime', args['CYCLETIME'])])
+                                         ('Category', args['CATEGORY'])])
+        config['Cycletime'] = OrderedDict([('Hours', args['CYCLEHR']),
+                                           ('Minutes', args['CYCLEMIN'])])
         config['Max posts to check'] = OrderedDict([('Max posts', args['MAXPOSTS'])])
         config['Adult Content'] = OrderedDict([('NSFW', args['NSFW'])])
         
         with open('settings.conf', 'w') as configfile:
             config.write(configfile)
 
-   
-   
+    def set_time(time):
+        """
+             Converts the minutes only time to hours and minutes for
+             use when updating the config file
+        """
+        hr = time//60
+        min_ = time % 60
+        return int(hr), min_
+  
+
     def file_found():
         """
             Returns true if the file exists, otherwise it returns false
@@ -348,7 +360,7 @@ class Config():
             return False
         else:
             log.debug("Settings.conf exists.")
-            return True
+            return config
 
 
     def read_config():
@@ -358,31 +370,105 @@ class Config():
             them to parse_cmd_args() to set as default values, since that is
             the point of the config file.
         """
-        config = configparser.ConfigParser()
         global URL
         
         # create default config file if not created
-        if not Config.file_found():
+        config = Config.file_found()
+
+        # if the config file does not exist, create it
+        # and make sure config var is set to good parser
+        if not config:
             log.debug("Creating configuration file")
             Config.config(Config.default_values)
+            config = configparser.ConfigParser()
 
         config.read('settings.conf')
+
+        # get values stored in settings.conf
         args = {} 
         args['SUBREDDITS'] = config.get('Options', 'Subreddits',
                                 fallback = "futureporn+wallpapers+lavaporn+"
                                   "earthporn+imaginarystarscapes+spaceporn")
         args['MINWIDTH'] = config.getint('Options', 'Minwidth', fallback = 1024)
-        print(args['MINWIDTH'])
         args['MINHEIGHT'] = config.getint('Options', 'Minheight', fallback = 768)
         args['MAXPOSTS'] = config.getint('Max posts to check', 'Max posts',
                                  fallback = 5)
-        args['CYCLETIME'] = config.getfloat('Options', 'Cycletime', fallback = .05)
+        args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes', fallback = 0.05)
+        hours = config.getint('Cycletime', 'Hours', fallback = 0)
+        args['CYCLETIME'] = hours * 60 + args['CYCLETIME']
         args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
         args['NSFW'] = config.getboolean('Adult Content', 'NSFW', fallback = False)
         args['DOWNLOADLOCATION'] = config.get('Save Location', 'Directory',
                                       fallback = os.getcwd())
         URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + args['CATEGORY'] + "/"
         return args
+
+    def minwidth():
+        """
+            returns the value specified by the method name from the
+            settings.conf file. These methods are mostly used in the
+            GUI to insert the values stored in settings.conf into the
+            Entries on the GUI.
+        """
+        config = Config.file_found()
+        
+        if config:
+            minwidth = config.getint('Options', 'Minwidth')
+            return minwidth
+
+        # this is so we don't break anything if no value is set
+        # for this particular value in settings.conf
+        return ""
+
+    def minheight():
+        config = Config.file_found()
+        if config:
+            minheight = config.getint('Options', 'Minheight')
+            return minheight
+        return ""
+
+    def cycletime():
+        config = Config.file_found()
+        if config:
+            min_ = config.getfloat('Cycletime', 'Minutes')
+            hr = config.getint('Cycletime', 'Hours')
+            return hr, min_
+        return "", ""
+
+    def dlLoc():
+        config = Config.file_found()
+        if config:
+            dlLoc = config.get('Save Location', 'Directory')
+            return dlLoc
+        return ""
+  
+    def nsfw():
+        config = Config.file_found()
+        if config:
+            nsfw = config.getboolean('Adult Content', 'NSFW')
+            return nsfw
+        return False 
+
+    def subreddits():
+        config = Config.file_found()
+        if config:
+            subreddits = config.get('Options', 'Subreddits')
+            return subreddits 
+        return ""
+
+    def category():
+        config = Config.file_found()
+        if config:
+            category = config.get('Options', 'Category')
+            return category 
+        return ""
+
+    def maxposts():
+        config = Config.file_found()
+        if config:
+            maxposts = config.getint('Options', 'Maxposts')
+            return maxposts 
+        return ""
 
 
 ####################################################################
@@ -1082,20 +1168,23 @@ def Parse_cmd_args():
     a['CYCLETIME'] = args.cycletime
     a['CATEGORY'] = args.category
     SINGLELINK = args.link
+    log.debug("SUBREDDIT is %s", args.subreddits)
     a['SUBREDDITS'] = args.subreddits
     a['NSFW'] = args.nsfw
     a['DOWNLOADLOCATION'] = args.downloadLoc
     
-    # must declare as global so rest of program can see the values
-    MINWIDTH  =  a['MINWIDTH'] 
-    MINHEIGHT =  a['MINHEIGHT']
-    MAXPOSTS  =  a['MAXPOSTS'] 
-    CYCLETIME =  a['CYCLETIME']
-    CATEGORY  =  a['CATEGORY'] 
-    SUBREDDITS=  a['SUBREDDITS']
-    NSFW      =  a['NSFW']
+    # declare as global so rest of program can see the values
+    MINWIDTH   =  a['MINWIDTH'] 
+    MINHEIGHT  =  a['MINHEIGHT']
+    MAXPOSTS   =  a['MAXPOSTS'] 
+    CYCLETIME  =  a['CYCLETIME']
+    CATEGORY   =  a['CATEGORY'] 
+    SUBREDDITS =  a['SUBREDDITS']
+    NSFW       =  a['NSFW']
     DOWNLOADLOCATION = a['DOWNLOADLOCATION'] 
+    URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
     return a
+
 def convert_nsfw(nsfw):
     # converts nsfw value from T/F to 1/0
     if nsfw == "True":
