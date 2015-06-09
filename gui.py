@@ -364,7 +364,10 @@ class PastImgs(Frame):
 class Settings(Frame):
 
     def __init__(self, parent, controller):
+        # force settings file to be created, so we have default
+        # values the first time we run the GUI
         # Frames
+        temp = rp.Config.read_config()
         Frame.__init__(self, parent)
         label = Label(self, text="Settings", font = LARGE_FONT, bg="yellow")
         label.pack(pady = 10, padx = 10)
@@ -372,29 +375,36 @@ class Settings(Frame):
         # subreddit border
         self.subredditForm = LabelFrame(self, text = "Subreddits")
         # nsfw border
-        self.checks = LabelFrame(self.top, text = "Adult Content")
+        self.checksFrame = LabelFrame(self.top, text = "Adult Content")
+        self.checks = Frame(self.checksFrame)
         # width x height
         self.dimensions = LabelFrame(self.top, 
-                                     text = "Minimum Picture Resolution")
+                                     text = "Picture Resolution")
         self.res = Frame(self.dimensions)
+        # cycletime border and frame
+        self.ct = LabelFrame(self.top, text = "Wallpaper Timer")
+        self.ctFrame = Frame(self.ct)
         # download location border
         self.dlFrame = LabelFrame(self, text = "Picture download location")
                 
         # Buttons
         self.letsGo = Button(self, text = "Let's Go!")
+#self.help = Button(self, text = "Help", command = self.helpButt)
       
         # subreddit entry
         subtxt = Label(self.subredditForm, text = "Subreddits (separated by +)",
                        pady = 15)
         subtxt.grid(row = 1, columnspan = 2, ipadx = 5, sticky = "w")
-        self.subreddits = Entry(self.subredditForm, width = 29)
+        self.subreddits = Entry(self.subredditForm, width = 35)
+        self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = (0,10),
                              sticky = "w")
         # "download to" entry
         self.dlTxt = Label(self.dlFrame, text = "Download pictures to:", 
                            pady = 15)
         self.dlTxt.grid(row = 0, column = 0, ipadx = 5, sticky = "w")
-        self.dlLoc = Entry(self.dlFrame, width = 30)
+        self.dlLoc = Entry(self.dlFrame, width = 40)
+        self.dlLoc.insert(0, rp.Config.dlLoc())
         self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = (0, 10))
 
         # Frames for width x height
@@ -408,6 +418,7 @@ class Settings(Frame):
         minWidthTxt.grid(row = 0, column = 0, sticky = "e", pady = (10, 0))
         # min width entry
         self.minwidth = Entry(self.widthF, width = 6)
+        self.minwidth.insert(0, rp.Config.minwidth())
         self.minwidth.grid(row = 0, column = 1, padx = (5, 5))
         
         # Min height
@@ -415,9 +426,9 @@ class Settings(Frame):
         minHeightTxt.grid(row = 1, column = 0, sticky = "e", pady = (0, 6))
         # min height entry
         self.minheight = Entry(self.heightF, width = 6)
+        self.minheight.insert(0, rp.Config.minheight())
         self.minheight.grid(row = 1, column = 1, padx = (0, 10), pady = (0, 10))
-        
-
+       
         # nsfw checkbutton
         # nsfw on text
         nsfwTxt = Label(self.checks, text = "NSFW")
@@ -430,37 +441,72 @@ class Settings(Frame):
         self.nsfwOff.set("Off")
         # nsfw var config
         self.onOff = BooleanVar() #IntVar()
-
+        self.onOff.set(rp.Config.nsfw())
         # nsfw checkbutton config
-        self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),\
+        self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),
                                 variable = self.onOff)
+        # force text update depending on settings.conf state
+        self.setup_nsfw()
+       
+        # cycletime txt
+        self.ctTxt = Label(self.ctFrame, text = "Set for:")
+        self.ctTxt.grid(row = 0, column = 0, sticky = "e", padx = (5,0))
+        # cycletime entry
+        self.rpHr, self.rpMin = rp.Config.cycletime()
+        # hour txt/entry
+        self.ctHourE = Entry(self.ctFrame, width = 4)
+        self.ctHourE.insert(0, self.rpHr)
+        self.ctHourE.grid(row = 0, column = 1, padx = (5,0))
+        self.ctHourTxt = Label(self.ctFrame, text = "hrs")
+        self.ctHourTxt.grid(row = 0, column = 2, padx = (0, 5))
+        # min txt/entry
+        self.ctMinE = Entry(self.ctFrame, width = 4)
+        self.ctMinE.insert(0, self.rpMin)
+        self.ctMinE.grid(row = 0, column = 3)
+        self.ctMinTxt = Label(self.ctFrame, text = "mins", anchor = "w")
+        self.ctMinTxt.grid(row = 0, column = 4, padx = (0, 5))
+        self.ctFrame.pack(side = "top", ipady = 2)
+        
         # packs/binds
         # button packs
         self.letsGo.pack(side = "bottom", anchor = "e", padx = 50, pady = 40)
         self.letsGo.bind("<Button-1>", self.get_pics)
         self.nsfw.bind("<Button-1>", self.check_nsfw)
-        self.nsfw.pack(side = "left", anchor = "w", pady = 10,\
-                       padx = (15, 10))
+        self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
+                       padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
-        self.top.pack(side = "top", anchor = "w", pady = (5,0))
+        self.top.pack(side = "top", anchor = "w", pady = (10, 0))
         self.subredditForm.pack(side = "top", anchor = "w",\
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
                           padx = (15, 10))
-        self.dimensions.pack(side = "left", anchor = "w", pady = 10,\
-                             padx = (15, 10))
+        self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
+                             padx = (15, 5))
         self.res.pack(side = "top")
-        self.checks.pack(side = "top", anchor = "w", pady = 10,\
-                         padx = (15, 10))
+        self.checks.pack(side = "top")
+        self.checksFrame.pack(side = "left", anchor = "nw",\
+                         padx = (5, 5))
+        self.ct.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-    def check_nsfw(self, event):
+    def check_nsfw(self, event): 
         """ checks if the nsfw checkbox is clicked or not """
         if (self.onOff.get()):
             self.nsfw.config(text = self.nsfwOff.get())
         else:
             self.nsfw.config(text = self.nsfwOn.get())
-    
-    
+
+
+    def setup_nsfw(self):
+        """ 
+            used to set up the nsfw checkbox for the first
+            time only.
+        """
+        if (self.onOff.get()):
+            self.nsfw.config(text = self.nsfwOn.get())
+        else:
+            self.nsfw.config(text = self.nsfwOff.get())
+
+
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -469,7 +515,8 @@ class Settings(Frame):
         self.values['--nsfw'] = self.onOff.get()
         self.values['-s'] = self.subreddits.get()
         self.values['-dl'] = self.dlLoc.get()
-#self.values['-t'] = self.cycletime.get()
+        totalTime = self.ctHourE.get() * 60 + self.ctMinE.get()
+        self.values['-t'] = totalTime
         return self.values 
 
     
