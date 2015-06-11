@@ -156,7 +156,7 @@ class Img():
                         "%d seconds" % (self.image_name, (CYCLETIME*60))
             log.debug(statusStr)
             
-            # sets the last wallpaper in the config file
+            # sets the last wallpaper to the config file
             config = Config.file_found()
             if config:
                 config.set('Last Wallpaper', 'Wallpaper', self.image_name)
@@ -492,6 +492,7 @@ class Config():
         config = Config.file_found()
         if config:
             subreddits = config.get('Options', 'Subreddits')
+            subreddits = subreddits.replace("+", " ")
             return subreddits 
         return ""
 
