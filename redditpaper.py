@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#! /usr/bin/env python3.4
 
 # Created by Cameron Gagnon
 # Version: beta
@@ -101,8 +101,6 @@ def main():
 ####################################################################
 ### CLASS IMPLEMNTATIONS
 ####################################################################
-
-
 class Img():
     """
         Creates an img instance for each post found when returning
@@ -138,11 +136,11 @@ class Img():
     def setSaveLoc(self):
         self.save_location = DOWNLOADLOCATION + str(self.image_name)
 
-    def formatImgName():
+    def formatImgName(self):
         # finds last '/' in url
-        remove = url.rindex('/')
+        remove = self.link.rindex('/')
         # returns only past the last '/'
-        self.image_name =  url[-(len(url) - remove - 1):]
+        self.image_name =  self.link[-(len(self.link) - remove - 1):]
 
     def setAsWallpaper(self):
         """ 
@@ -157,6 +155,16 @@ class Img():
             statusStr = "Wallpaper should be set to: %s for "\
                         "%d seconds" % (self.image_name, (CYCLETIME*60))
             log.debug(statusStr)
+            
+            # sets the last wallpaper in the config file
+            config = Config.file_found()
+            if config:
+                config.set('Last Wallpaper', 'Wallpaper', self.image_name)
+                with open('settings.conf', 'w') as configfile:
+                    config.write(configfile)
+            # push the image info to the GUI?
+   
+
 #gui.STATUSBAR.setText(statusStr)
 #TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
 #TO FIX gui.AddButtons.setStatusText(statusStr)
@@ -169,9 +177,8 @@ class Img():
                           "there is a foward slash at the end of the "
                           "path in the SETWALLPAPER variable.", exc_info=True)
             sys.exit(1)
+
 ########################################################################
-
-
 class SingleImg(Img):
     """
         Downloads the image from the link manually entered by the user
@@ -188,7 +195,7 @@ class SingleImg(Img):
         self.setSaveLoc()
 
         # gets the pic download information and sets the download location
-        picdl = urllib.request.Request(link, headers = { 'User-Agent': USERAGENT})
+        picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
     
         try:
             picdl = urllib.request.urlopen(picdl)
@@ -204,10 +211,9 @@ class SingleImg(Img):
         
         with open(self.save_location, "wb") as picfile:
             picfile.write(picdl.read())
-        
+
+
 #######################################################################
-
-
 class DBImg():
     """
         Creates an encapsulation of data about previously downloaded
@@ -229,9 +235,9 @@ class DBImg():
 
     def setResolution(self):
         self.resolution = self.width + 'x' + self.height
+
+
 ########################################################################
-
-
 class PictureList():
     """
         Returns information/list of images that have been downloaded
@@ -255,8 +261,8 @@ class AboutInfo():
     def version():
         return AboutInfo._version
 
-########################################################################
 
+########################################################################
 class Database():
 
     def __init__(self): #Create_DB()
@@ -291,10 +297,12 @@ class Database():
     #         successful download
     def Insert_ImgDB(im, width, height):
         log.debug("Data to insert\n\t\t\t\t\t\t  id: %s"\
-                 "\n\t\t\t\t\t\t  image_name: %s"\
-                 "\n\t\t\t\t\t\t  width: %s"\
-                 "\n\t\t\t\t\t\t  height: %s",
-                 im.id, im.image_name, width, height) 
+                  "\n\t\t\t\t\t\t  image_name: %s"\
+                  "\n\t\t\t\t\t\t  title: %s"\
+                  "\n\t\t\t\t\t\t  link: %s"\
+                  "\n\t\t\t\t\t\t  width: %s"\
+                  "\n\t\t\t\t\t\t  height: %s",
+                  im.id, im.image_name, im.title, im.link, width, height) 
         cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?)',\
                     [im.id, im.image_name, im.title, im.link, width, height])
         sql.commit()
@@ -314,9 +322,9 @@ class Config():
                       'CATEGORY': "hot",
                       'CYCLETIME' : 0.05,
                       'MAXPOSTS': 5,
-                      'NSFW': False
+                      'NSFW': False,
+                      'WALLPAPER': ''
                      }
-    
     
     def config(args):
         """
@@ -324,23 +332,52 @@ class Config():
             determined by the dict that is passed in
         """
         # split up the jumble of time to set the hr and min correctly
-        args['CYCLEHR'], args['CYCLEMIN'] = Config.set_time(args['CYCLETIME'])
+        args['CYCLEHR'], args['CYCLEMIN'] = Config.format_time(args['CYCLETIME'])
+        # convert NSFW from on/off to True/False 
+        args['NSFW'] = Config.convert_NSFW(args['NSFW'])
 
         config = configparser.ConfigParser()
-        config['Save Location'] = OrderedDict([('Directory', args['DOWNLOADLOCATION'])])
+        config['Save Location'] = OrderedDict([('Directory',
+                                                args['DOWNLOADLOCATION'])])
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
                                          ('Minheight', args['MINHEIGHT']),
                                          ('Subreddits', args['SUBREDDITS']),
                                          ('Category', args['CATEGORY'])])
         config['Cycletime'] = OrderedDict([('Hours', args['CYCLEHR']),
                                            ('Minutes', args['CYCLEMIN'])])
-        config['Max posts to check'] = OrderedDict([('Max posts', args['MAXPOSTS'])])
+        config['Max posts to check'] = OrderedDict([('Max posts',
+                                                     args['MAXPOSTS'])])
         config['Adult Content'] = OrderedDict([('NSFW', args['NSFW'])])
-        
+        # this try/except is used because the cmdline args come through here
+        # and doesn't contain the wallpaper argument, so it is not always
+        # provided
+        try: 
+            config['Last Wallpaper'] = OrderedDict([('Wallpaper',
+                                                     args['WALLPAPER'])])
+        except KeyError:
+            configParser = configparser.ConfigParser()
+            # this is cyclical because we must read the setting in order
+            # to reset it with the same value, as this file is rewritten
+            # each call to this function. This is so we can pass one of
+            # two dictionarys to it without rewriting similar code.
+            # ^^CLArgs or DefaultValues
+            args['WALLPAPER'] = Config.lastImg()
+            config['Last Wallpaper'] = OrderedDict([('Wallpaper',
+                                                     args['WALLPAPER'])])
+
         with open('settings.conf', 'w') as configfile:
             config.write(configfile)
 
-    def set_time(time):
+    
+    def convert_NSFW(nsfw):
+        log.debug("nsfw in convert is: %s " % nsfw)
+        if nsfw:
+            return True
+        return False
+
+
+
+    def format_time(time):
         """
              Converts the minutes only time to hours and minutes for
              use when updating the config file
@@ -394,6 +431,8 @@ class Config():
         args['MAXPOSTS'] = config.getint('Max posts to check', 'Max posts',
                                  fallback = 5)
         args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes', fallback = 0.05)
+        # must convert minutes and hours to only minutes as that's how the 
+        # cycle time works
         hours = config.getint('Cycletime', 'Hours', fallback = 0)
         args['CYCLETIME'] = hours * 60 + args['CYCLETIME']
         args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
@@ -460,8 +499,10 @@ class Config():
         config = Config.file_found()
         if config:
             category = config.get('Options', 'Category')
+            firstLetter = category[0].upper()
+            category = firstLetter + category[1:]
             return category 
-        return ""
+        return "Hot"
 
     def maxposts():
         config = Config.file_found()
@@ -469,13 +510,17 @@ class Config():
             maxposts = config.getint('Options', 'Maxposts')
             return maxposts 
         return ""
-
+    
+    def lastImg():
+        config = Config.file_found()
+        if config:
+            lastImg = config.get('Last Wallpaper', 'Wallpaper')
+            return lastImg
+        return ""
 
 ####################################################################
 ### FUNCTION IMPLEMENTATIONS
 ####################################################################
-
-###################################################################
 def Config_logging():
     """ Configures the logging to external file """
     global log
@@ -509,6 +554,7 @@ def Config_logging():
     logging.getLogger('').addHandler(console)
     log = logging.getLogger('reddit-paper')
 
+
 #####################################################################
 #REQUIRES url
 #MODIFIES nothing
@@ -525,21 +571,31 @@ def Connected(url):
         content = url.read().decode('utf-8')
         json.loads(content)
         url.close()
-        
-    except (HTTPError, URLError, timeout, AttributeError, ValueError):
+    # Error that usually occurs when there is no internet connection        
+    except URLError as e:
+        log.error("Not connected to the internet. Check "
+                  "your internet connection and try again.")
+        log.debug("Error is: %s" % e)
+        sys.exit(0)
+
+    except (HTTPError, timeout, AttributeError, ValueError) as e:
         log.error("You do not appear to be connected to Reddit.com."
                   " This is likely due to a redirect by the internet connection"
                   " you are on. Check to make sure no login is required and the"
                   " connection is stable, and then try again.")
+        log.debug("Error is: %s" % e)
         sys.exit(0)
 
     return r
+
+
 ####################################################################
 #MODIFIES Downloads the image specified by the user 
 #EFFECTS  Sets image as wallpaper
 def Single_link():
     if SINGLELINK:
         SingleImg(SINGLELINK)
+
 
 ####################################################################
 #REQUIRES img_link
@@ -554,16 +610,17 @@ def General_parser(img_link):
     image_name =  img_link[-(len(img_link) - remove_index - 1):]
     return image_name
 
+
 ####################################################################
 #REQUIRES url
 #MODIFIES url
 #EFFECTS  Returns the static download URL of the file, specific
-#         to Flickr. This S.O. post helped:
+#         to Flickr. This SO post helped:
 # https://stackoverflow.com/questions/21673323/download-flickr-images-of-specific-url
 #
 # This is a list of titles and how to determine size based on ending characters -
 # _o (original file) is used here as it is most reliable,
-# although likely sometimes very large
+# although sometimes a very large
 # https://www.flickr.com/services/api/misc.urls.html
 def Flickr_parse(url):
     try:
@@ -680,6 +737,8 @@ def Deviant_parse(url, regex):
         log.warning("Exception occured in Deviant_parse",
                          exc_info = True)
         return False, False
+
+
 ####################################################################
 # REQUIRES url in imgur formatting
 # MODIFIES url, image_name
@@ -696,6 +755,17 @@ def Imgur_image_format(url):
         
     log.debug("Image name is: %s", image_name)
     return image_name
+
+####################################################################
+# REQUIRES url for earlycanvas parsing
+# MODIFIES the link that gets passed as the download link
+# EFFECTS Returns the direct link to download the image
+def early_canvas_parser(url):
+    html = urllib.request.urlopen(url)
+    html = BeautifulSoup(html)
+    div = html.select('.item-image')[0]
+    url = div.findChildren()[0].get('src')
+    return url
 
 ####################################################################
 # REQUIRES valid imgur url
@@ -777,7 +847,7 @@ def Title_from_url(im):
             remove = im.link.rindex('/')                        
             image_name =  im.link[-(len(im.link) - remove - 1):]
             
-            return image_name, url, True
+            return image_name, im.link, True
         
         # flickr domain
         elif (regex_result[0].find("flickr") != -1):
@@ -801,15 +871,21 @@ def Title_from_url(im):
 
         # pic.ms just a slight change in url formatting
         elif (regex_result[0].find("pic.ms") != -1):
-            url = re.sub(r'html/', '', im.link)
+            im.link = re.sub(r'html/', '', im.link)
             image_name = General_parser(im.link)
-            return image_name, url, True
+            return im.image_name, im.link, True
 
         # reddit.com self post
         elif (regex_result[0].find("reddit.com") != -1):
             log.debug("Appears to be a self post from reddit.com")
             return False, False, False
 
+        # earlycanvas post
+        elif (regex_result[0].find("earlycanvas.com") != -1):
+            im.link = early_canvas_parser(im.link)
+            im.formatImgName()
+            return im.image_name, im.link, True
+            
         # all other domains with image type in url
         elif (im.link.find(".jpg") != -1) or (im.link.find(".png") != -1)\
              or (im.link.find(".gif") != -1):
@@ -1060,29 +1136,6 @@ def Main_photo_controller(r):
         i += 1
     log.debug("Exiting Main_photo_controller fn")
 
-####################################################################
-#REQUIRES setpaper is the command particular to each 
-#         gnome/desktop environment version that will set the 
-#         wallpaper via the command line
-#MODIFIES wallpaper on backgroun
-#EFFECTS  Sets the wallpaper of the system to be image_name
-def Set_wallpaper(image_name):
-    try:                            
-        subprocess.call(args = SETWALLPAPER + image_name, 
-                        shell = True)
-        log.debug("Wallpaper should be set to: %s"
-                           " Cycle time: %d seconds",
-                           image_name, (CYCLETIME*60))
-                            
-    except KeyboardInterrupt:
-            sys.exit(0)
-    except:
-        log.exception("Error setting wallpaper, it is likely the "
-                      "file path is not 100% correct. Make sure "
-                      "there is a foward slash at the end of the "
-                      "path in the SETWALLPAPER variable.",
-                      exc_info=True)
-        sys.exit(1)
 
 ###################################################################
 #REQUIRES SETWALLPAPER command, and image_list 
@@ -1102,6 +1155,8 @@ def Cycle_wallpaper():
         log.error("No posts appear to be in the specific "\
                   "subreddit/category selected. Try another category, or add "
                   "more subreddits to the list.")
+
+
 ###################################################################
 #REQUIRES command line args
 #MODIFIES some of the global variables declared at top of program
@@ -1119,6 +1174,7 @@ def Parse_cmd_args():
     global NSFW
 
     default = Config.read_config()
+    log.debug("Default nsfw is: %s" % default['NSFW'])
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.", prog="redditpaper.py")
@@ -1150,10 +1206,8 @@ def Parse_cmd_args():
                         help="Enter a list of mostly image subreddits "
                              "pull the top images from those subreddits",
                         default = default['SUBREDDITS'])
-    parser.add_argument("--nsfw", type = convert_nsfw, 
-                        choices = [0, 1], default = default['NSFW'],
-                        help="--nsfw True will filter out NSFW images, and "
-                             "vice versa")
+    parser.add_argument("--nsfw", help="--nsfw will filter images "
+                                        "out if they are NSFW")
     parser.add_argument("-dl", "--downloadLoc", type = str,
                         help="Set the file location where the pictures "
                              "will be downloaded to. EX. "
@@ -1170,6 +1224,7 @@ def Parse_cmd_args():
     SINGLELINK = args.link
     log.debug("SUBREDDIT is %s", args.subreddits)
     a['SUBREDDITS'] = args.subreddits
+    log.debug("NSFW is %s", args.nsfw)
     a['NSFW'] = args.nsfw
     a['DOWNLOADLOCATION'] = args.downloadLoc
     
@@ -1185,16 +1240,6 @@ def Parse_cmd_args():
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
     return a
 
-def convert_nsfw(nsfw):
-    # converts nsfw value from T/F to 1/0
-    if nsfw == "True":
-        nsfw = 1
-    elif nsfw == "False":
-        nsfw = 0
-    else:
-        log.error("Enter valid nsfw value")
-        sys.exit(1)
-    return nsfw
 
 ###################################################################
 if __name__ == '__main__':
