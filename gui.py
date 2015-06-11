@@ -376,7 +376,7 @@ class Settings(Frame):
         label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
         # subreddit border
-        self.subredditForm = LabelFrame(self, text = "Subreddits")
+        self.subredditForm = LabelFrame(self, text = "Subreddits to pull from")
         # nsfw border
         self.checksFrame = LabelFrame(self.top, text = "Adult Content")
         self.checks = Frame(self.checksFrame)
@@ -400,10 +400,10 @@ class Settings(Frame):
 #self.help = Button(self, text = "Help", command = self.helpButt)
       
         # subreddit entry
-        subtxt = Label(self.subredditForm, text = "Subreddits (separated by +)",
+        subtxt = Label(self.subredditForm, text = "Whitespace separated:",
                        pady = 15)
         subtxt.grid(row = 1, columnspan = 2, ipadx = 5, sticky = "w")
-        self.subreddits = Entry(self.subredditForm, width = 35)
+        self.subreddits = Entry(self.subredditForm, width = 39)
         self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = (0,10),
                              sticky = "w")
@@ -428,7 +428,6 @@ class Settings(Frame):
         self.minwidth = Entry(self.widthF, width = 6)
         self.minwidth.insert(0, rp.Config.minwidth())
         self.minwidth.grid(row = 0, column = 1, padx = (5, 5))
-        
         # Min height
         minHeightTxt = Label(self.heightF, text = "  Min-height:")
         minHeightTxt.grid(row = 1, column = 0, sticky = "e", pady = (0, 6))
@@ -439,22 +438,14 @@ class Settings(Frame):
        
         # nsfw checkbutton
         # nsfw on text
-        nsfwTxt = Label(self.checks, text = "NSFW")
+        nsfwTxt = Label(self.checks, text = "NSFW:")
         nsfwTxt.pack(side = "left", ipadx = 5)
-        self.nsfwOn = StringVar()
-        self.nsfwOn.set("On")
-        
-        # nsfw off text
-        self.nsfwOff = StringVar()
-        self.nsfwOff.set("Off")
         # nsfw var config
         self.onOff = BooleanVar() #IntVar()
         self.onOff.set(rp.Config.nsfw())
         # nsfw checkbutton config
-        self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),
+        self.nsfw = Checkbutton(self.checks, text = "On",
                                 variable = self.onOff)
-        # force text update depending on settings.conf state
-        #self.setup_nsfw()
        
         # cycletime txt
         self.ctTxt = Label(self.ctFrame, text = "Set for:")
@@ -490,7 +481,6 @@ class Settings(Frame):
         # button packs
         self.letsGo.pack(side = "bottom", anchor = "e", padx = 50, pady = 40)
         self.letsGo.bind("<Button-1>", self.get_pics)
-        self.nsfw.bind("<Button-1>", self.check_nsfw)
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
@@ -510,24 +500,6 @@ class Settings(Frame):
         self.cat.pack(side = "bottom")
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-    def check_nsfw(self, event): 
-        """ checks if the nsfw checkbox is clicked or not """
-        if (self.onOff.get()):
-            self.nsfw.config(text = self.nsfwOff.get())
-        else:
-            self.nsfw.config(text = self.nsfwOn.get())
-
-
-    def setup_nsfw(self):
-        """ 
-            used to set up the nsfw checkbox for the first
-            time only.
-        """
-        if (self.onOff.get()):
-            self.nsfw.config(text = self.nsfwOn.get())
-        else:
-            self.nsfw.config(text = self.nsfwOff.get())
-
 
     def get_values(self):
         """ returns the values stored in the entry boxes """
@@ -535,7 +507,7 @@ class Settings(Frame):
         self.values['-mw'] = self.minwidth.get()
         self.values['-mh'] = self.minheight.get()
         self.values['--nsfw'] = self.onOff.get()
-        self.values['-s'] = self.subreddits.get()
+        self.values['-s'] = self.subreddits.get().replace(" ", "+")
         self.values['-dl'] = self.dlLoc.get()
         totalTime = self.ctHourE.get() * 60 + self.ctMinE.get()
         self.values['-t'] = totalTime
