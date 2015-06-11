@@ -13,6 +13,9 @@ from PIL import Image
 FONT = "Verdana"
 LARGE_FONT = {FONT, "12"}
 XLARGE_FONT = {FONT, "16"}
+# TOFIX: H1 should be set to larger font
+# not same size as other font. Max font size?
+H1 = {FONT, "24"}
 CURSOR = "hand2"
 HYPERLINK = "#0000EE"
 
@@ -232,12 +235,12 @@ class CurrentImg(Frame):
         self.label = Label(self.frame, text="Title/link to submission:", 
                            font = UNDERLINE, 
                            fg=HYPERLINK, cursor = CURSOR)
-        self.label.pack(pady = 10, padx = 10)
+        self.label.pack(pady = (35, 10), padx = 10)
         self.label.bind("<Button-1>", self.open_link)
 
         # thumbnail of image currently set as background
-        self.photoLocation = "./images/currentpic_square.png"
-                           # "./images/placeholder400x400.png"
+        self.photoLocation = "./images/placeholder400x400.png"
+                           # "./images/currentpic_square.png"
         self.photo = PhotoImage(file = self.photoLocation)
         self.photoLabel = Label(self.frame, image = self.photo)
         
@@ -369,7 +372,7 @@ class Settings(Frame):
         # Frames
         temp = rp.Config.read_config()
         Frame.__init__(self, parent)
-        label = Label(self, text="Settings", font = LARGE_FONT, bg="yellow")
+        label = Label(self, text="Settings", font = H1, bg="yellow")
         label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
         # subreddit border
@@ -381,9 +384,14 @@ class Settings(Frame):
         self.dimensions = LabelFrame(self.top, 
                                      text = "Picture Resolution")
         self.res = Frame(self.dimensions)
-        # cycletime border and frame
-        self.ct = LabelFrame(self.top, text = "Wallpaper Timer")
+        # cycletime and category border and frame
+        self.topRt = Frame(self.top)
+        self.ct = LabelFrame(self.topRt, text = "Wallpaper Timer")
         self.ctFrame = Frame(self.ct)
+        self.cat = LabelFrame(self.topRt, text = "Section")
+        self.catFrame = Frame(self.cat, width = 200, height = 30)
+        self.catFrame.pack_propagate(0)
+
         # download location border
         self.dlFrame = LabelFrame(self, text = "Picture download location")
                 
@@ -446,7 +454,7 @@ class Settings(Frame):
         self.nsfw = Checkbutton(self.checks, text = self.nsfwOff.get(),
                                 variable = self.onOff)
         # force text update depending on settings.conf state
-        self.setup_nsfw()
+        #self.setup_nsfw()
        
         # cycletime txt
         self.ctTxt = Label(self.ctFrame, text = "Set for:")
@@ -466,6 +474,17 @@ class Settings(Frame):
         self.ctMinTxt = Label(self.ctFrame, text = "mins", anchor = "w")
         self.ctMinTxt.grid(row = 0, column = 4, padx = (0, 5))
         self.ctFrame.pack(side = "top", ipady = 2)
+       
+        # category dropdown
+        self.choices = ["Hot", "New", "Rising", "Top", "Controversial"]
+        self.catVar = StringVar(self)
+        self.catVar.set(rp.Config.category())
+        self.catDD = OptionMenu(self.catFrame, self.catVar, *self.choices)
+        self.catDD.config(width = 10)
+        self.catDD.pack(side = "right", anchor = "e", padx = (0, 5)) 
+        self.catTxt = Label(self.catFrame, text = "Category:")
+        self.catTxt.pack(side = "right", padx = (5, 0), anchor = "e")
+        self.catFrame.pack(side = "top", ipady = 2)
         
         # packs/binds
         # button packs
@@ -486,7 +505,10 @@ class Settings(Frame):
         self.checks.pack(side = "top")
         self.checksFrame.pack(side = "left", anchor = "nw",\
                          padx = (5, 5))
-        self.ct.pack(side = "left", anchor = "nw", padx = (5, 5))
+        # cycletime and category frame
+        self.ct.pack(side = "top")
+        self.cat.pack(side = "bottom")
+        self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
     def check_nsfw(self, event): 
         """ checks if the nsfw checkbox is clicked or not """
@@ -517,6 +539,7 @@ class Settings(Frame):
         self.values['-dl'] = self.dlLoc.get()
         totalTime = self.ctHourE.get() * 60 + self.ctMinE.get()
         self.values['-t'] = totalTime
+        self.values['-c'] =  self.catVar.get().lower()
         return self.values 
 
     
@@ -558,7 +581,7 @@ class About(Frame):
         Frame.__init__(self, parent)
        
         # frames
-        label = Label(self, text="About", font = LARGE_FONT, bg="green")
+        label = Label(self, text="About", font = H1, bg="green")
         label.pack(pady = 10, padx = 10)
         self.authorFrame = LabelFrame(self, text = "Author")
         self.donateFrame = LabelFrame(self, text = "Donations")
