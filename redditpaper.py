@@ -39,7 +39,6 @@ import subprocess
 import logging
 import logging.handlers
 import getpass
-import gui
 from PIL import Image
 from bs4 import BeautifulSoup
 from socket import timeout
@@ -88,7 +87,6 @@ def main():
         Cycle_wallpaper()
 
         sql.close()
-
         # this is printed for ease of use when viewing the debug file
         log.debug("################################################"
                   "################################################\n")
@@ -113,6 +111,7 @@ class Img():
  
     def setProperties(self, post):
         self.setTitle(post.title)
+        self.setPost(post.permalink)
         self.setLink(post.url)
         self.setID(post.id)
         self.setNSFW(post.over_18)
@@ -127,6 +126,9 @@ class Img():
     def setLink(self, link):
         self.link = link
 
+    def setPost(self, post):
+        self.post = post
+
     def setID(self, id):
         self.id = id
 
@@ -140,7 +142,7 @@ class Img():
         # finds last '/' in url
         remove = self.link.rindex('/')
         # returns only past the last '/'
-        self.image_name =  self.link[-(len(self.link) - remove - 1):]
+        self.image_name =  self.link[remove + 1:]
 
     def setAsWallpaper(self):
         """ 
@@ -222,20 +224,32 @@ class DBImg():
     """
 
     def __init__(self, image_name):
-        setLookUpInfo(image_name)
+        self.setLookUpInfo(image_name)
 
     def setLookUpInfo(self, image_name):
-        self.title,
-        self.link,
-        self.width,
-        self.height = cur.execute('SELECT ImgTitle, ImgLink, Width, Height\
+        sql = sqlite3.connect('wallpaper.db')
+        cur = sql.cursor()
+        
+        try:
+            cur.execute('SELECT ImgTitle, ImgLink, Width, Height\
                                   FROM oldposts WHERE ImgName=?',
                                   [image_name])
-        self.save_location = DOWNLOADLOCATION + image_name
+        
+            result = cur.fetchone()
+            self.title = result[0]
+            self.link = result[1]
+            self.width = result[2]
+            self.height = result[3]
+            self.image_name = image_name
+            self.save_location = DOWNLOADLOCATION + self.image_name
+        except (sqlite3.OperationalError, TypeError):
+            pass
 
     def setResolution(self):
         self.resolution = self.width + 'x' + self.height
 
+    def updateSaveLoc(self):
+        self.save_location = DOWNLOADLOCATION + self.image_name
 
 ########################################################################
 class PictureList():
@@ -274,12 +288,8 @@ class Database():
         # create image database
         cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                      ImgName TEXT, ImgTitle TEXT, ImgLink TEXT,\
-                     Width INT, Height INT)')
+                     ImgPost TEXT, Width INT, Height INT)')
     
-        # create settings database for user settings from gui
-        cur.execute('CREATE TABLE IF NOT EXISTS settings(mw INT,\
-                     mh INT, ct INT, subreddits TEXT, nsfw INT,\
-                     dl TEXT)')
         # commit dem changes yo
         sql.commit()
 
@@ -299,12 +309,15 @@ class Database():
         log.debug("Data to insert\n\t\t\t\t\t\t  id: %s"\
                   "\n\t\t\t\t\t\t  image_name: %s"\
                   "\n\t\t\t\t\t\t  title: %s"\
+                  "\n\t\t\t\t\t\t  Post: %s"\
                   "\n\t\t\t\t\t\t  link: %s"\
                   "\n\t\t\t\t\t\t  width: %s"\
                   "\n\t\t\t\t\t\t  height: %s",
-                  im.id, im.image_name, im.title, im.link, width, height) 
-        cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?)',\
-                    [im.id, im.image_name, im.title, im.link, width, height])
+                  im.id, im.image_name, im.title, im.post, im.link,
+                  width, height) 
+        cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?, ?)',\
+                    [im.id, im.image_name, im.title, im.post, im.link, 
+                     width, height])
         sql.commit()
 
 
@@ -376,15 +389,14 @@ class Config():
         return False
 
 
-
     def format_time(time):
         """
              Converts the minutes only time to hours and minutes for
              use when updating the config file
         """
-        hr = time//60
-        min_ = time % 60
-        return int(hr), min_
+        hr = float(time//60)
+        min_ = float(time % 60)
+        return hr, min_
   
 
     def file_found():
@@ -398,7 +410,6 @@ class Config():
         else:
             log.debug("Settings.conf exists.")
             return config
-
 
     def read_config():
         """
@@ -433,7 +444,7 @@ class Config():
         args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes', fallback = 0.05)
         # must convert minutes and hours to only minutes as that's how the 
         # cycle time works
-        hours = config.getint('Cycletime', 'Hours', fallback = 0)
+        hours = config.getfloat('Cycletime', 'Hours', fallback = 0)
         args['CYCLETIME'] = hours * 60 + args['CYCLETIME']
         args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
         args['NSFW'] = config.getboolean('Adult Content', 'NSFW', fallback = False)
@@ -470,7 +481,7 @@ class Config():
         config = Config.file_found()
         if config:
             min_ = config.getfloat('Cycletime', 'Minutes')
-            hr = config.getint('Cycletime', 'Hours')
+            hr = config.getfloat('Cycletime', 'Hours')
             return hr, min_
         return "", ""
 
@@ -749,7 +760,7 @@ def Imgur_image_format(url):
     # finds last '/' in url
     remove = url.rindex('/')
     # returns only past the last '/'
-    image_name =  url[-(len(url) - remove - 1):]
+    image_name =  url[remove + 1:]
     
     if image_name.rfind('.') == -1:
         image_name = image_name + ".jpg"
@@ -761,7 +772,7 @@ def Imgur_image_format(url):
 # REQUIRES url for earlycanvas parsing
 # MODIFIES the link that gets passed as the download link
 # EFFECTS Returns the direct link to download the image
-def early_canvas_parser(url):
+def Early_canvas_parser(url):
     html = urllib.request.urlopen(url)
     html = BeautifulSoup(html)
     div = html.select('.item-image')[0]
@@ -818,6 +829,7 @@ def Imgur_parse(url, regex):
         log.debug("Something went wrong in Imgur_parse")
         return False, False
 
+
 ####################################################################
 #REQUIRES url of image to be renamed 
 #MODIFIES nothing
@@ -837,18 +849,17 @@ def Title_from_url(im):
            regex_result[0] == "i.imgur.com":
            
             # check if we encountered bad data such as a gif or gifv
-            return1, return2 = Imgur_parse(im.link, regex_result[0])
-            if return1:
-                return return1, return2, True
+            image_name, url = Imgur_parse(im.link, regex_result[0])
+            if image_name: 
+                return image_name, url, True
             else:
                 return False, False, False
 
         # staticflickr domain
         elif (regex_result[0].find("staticflickr") != -1):
-            remove = im.link.rindex('/')                        
-            image_name =  im.link[-(len(im.link) - remove - 1):]
+            im.formatImgName()
             
-            return image_name, im.link, True
+            return im.image_name, im.link, True
         
         # flickr domain
         elif (regex_result[0].find("flickr") != -1):
@@ -874,7 +885,7 @@ def Title_from_url(im):
         elif (regex_result[0].find("pic.ms") != -1):
             im.link = re.sub(r'html/', '', im.link)
             image_name = General_parser(im.link)
-            return im.image_name, im.link, True
+            return image_name, im.link, True
 
         # reddit.com self post
         elif (regex_result[0].find("reddit.com") != -1):
@@ -883,7 +894,7 @@ def Title_from_url(im):
 
         # earlycanvas post
         elif (regex_result[0].find("earlycanvas.com") != -1):
-            im.link = early_canvas_parser(im.link)
+            im.link = Early_canvas_parser(im.link)
             im.formatImgName()
             return im.image_name, im.link, True
             
@@ -907,6 +918,7 @@ def Title_from_url(im):
     except ValueError:
         log.exception("Error in finding title from URL", exc_info=True)
         return False, False, False
+
 
 ####################################################################
 #REQUIRES id of submission in question
@@ -932,6 +944,7 @@ def Already_downloaded(im):
         return True
     else:
         return False            
+
 
 ####################################################################
 #REQUIRES Full title of post which may have the reslotuion of the
@@ -959,6 +972,7 @@ def Valid_width_height(im):
         log.debug("The title of the submission does not appear"
                   " to contain the width and height of the image.")
 
+
 ####################################################################
 #REQUIRES width, height from valid id in database
 #MODIFIES nothing
@@ -971,8 +985,8 @@ def Check_width_height(id):
     log.debug("Lookup from Check_width_height: %s", lookup)
     
     try: 
-        width = lookup[4]
-        height = lookup[5]
+        width = lookup[5]
+        height = lookup[6]
     
         if ((int(width) >= MINWIDTH) and \
             (int(height) >= MINHEIGHT)):
@@ -1030,6 +1044,7 @@ def Lookup_width_height(im):
                  "Will not download.", im.image_name)
         return False
 
+
 ####################################################################
 #REQUIRES url, image_name, save_location, cur, sql
 #MODIFIES file on hard drive, image_list
@@ -1056,9 +1071,10 @@ def Download_img(url, im):
     
     with open(im.save_location, "wb") as picfile:
         picfile.write(picdl.read())
-#        image_list.append(im)
     
     return True
+
+
 ####################################################################
 #REQUIRES url 
 #MODIFIES download location, adds new picture to file
@@ -1080,7 +1096,7 @@ def Main_photo_controller(r):
        
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                  "\n\t\t\t\t\t\t  URL of post: %s",
+                  "\n\t\t\t\t\t\t  Link to Img: %s",
                   im.title, im.id, im.link)
         
         image_name, url, is_deviant = Title_from_url(im)
@@ -1105,8 +1121,8 @@ def Main_photo_controller(r):
                 if  Valid_width_height(im) and Download_img(url, im):
 
                     image_list.append(im)
-                    log.debug("Image successfully downloaded with"
-                              " WxH in title")
+                    log.debug("Image successfully downloaded with "
+                              "WxH in title")
                 # if it's not a good width because it's too small or we
                 # couldn't find the title, then we check if we can download the
                 # image and if that succeeds, then we check the width/height
@@ -1118,8 +1134,8 @@ def Main_photo_controller(r):
                     image_list.append(im)
                     # specifically for subs w/o WxH in title, but still
                     # have images to download (e.x. imaginarystarscapes)
-                    log.debug("Image successfully downloaded WITHOUT"
-                              " WxH in title")
+                    log.debug("Image successfully downloaded WITHOUT "
+                              "WxH in title")
                 else:
                     MAXPOSTS -= 1
             elif not Check_width_height(im.id):
@@ -1151,6 +1167,7 @@ def Cycle_wallpaper():
         log.debug(image_list)
         for im in image_list:
             im.setAsWallpaper()
+            print(CYCLETIME)
             time.sleep(CYCLETIME*60)
     except IndexError:
         log.error("No posts appear to be in the specific "\
