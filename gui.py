@@ -1,9 +1,13 @@
-#!/usr/bin/env python3.4
-
+#! /usr/bin/env python3.4
 import redditpaper as rp
+# must insert config here, so that it
+# works throughout both modules with onetime
+# setup
+rp.Config_logging()
 import webbrowser
 import os
 import subprocess
+import time
 from tkinter import *
 from tkinter import font
 from tkinter import StringVar
@@ -19,14 +23,15 @@ H1 = {FONT, "24"}
 CURSOR = "hand2"
 HYPERLINK = "#0000EE"
 
+
+
 class Application(Tk):
     width = 525
     height = 550
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
-        
-                # set title of application on titlebar
+        # set title of application on titlebar
         self.wm_title("Reddit Paper") 
         
         # set up frame to hold widgets
@@ -40,12 +45,11 @@ class Application(Tk):
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
 #        self.STATUSBAR = StatusBar(root)
-        self.frames = {}
         
         # window used to pack the pages into
         self.window = Frame(root, bg = "cyan")         
         self.window.pack()
-
+        self.frames = {}
         for F in (CurrentImg, PastImgs, Settings, About):
             frame = F(self.window, self)
             self.frames[F] = frame
@@ -53,15 +57,15 @@ class Application(Tk):
 
         # frame to show on startup
         self.show_frame(CurrentImg)
-
-    def show_frame(self, cont):
+        
+    def show_frame(self, page):
         """
             Input: the page to display
             Output: displays the page selected on button click
         """
-        frame = self.frames[cont]
+        frame = self.frames[page]
         frame.tkraise()
-
+        
     def setUpWindow(self):
         """ 
             Aligns the GUI to open in the middle
@@ -71,11 +75,11 @@ class Application(Tk):
         """
         ws = self.winfo_screenwidth()
         hs = self.winfo_screenheight()
-        self.x = (ws/2) - (self.width/2)
-        self.y = (hs/2) - (self.height/2)
+        self.x = (ws//2) - (self.width//2)
+        self.y = (hs//2) - (self.height//2)
         self.minsize(width = self.width, height = self.height)
         self.maxsize(width = self.width, height = self.height)
-        self.geometry('%dx%d+%d+%d' % (self.width, self.height, self.x, self.y))
+        self.geometry('{}x{}+{}+{}'.format(self.width, self.height, self.x, self.y))
 
 
 
@@ -139,15 +143,15 @@ class Messages():
         w = 155
         h = 80
         x, y = master.position_on_screen()
-        x = (Application.width/2) + x - (w/2)
-        y = (Application.height/2) + y - (3*(h)) # 3* for aesthetic reasons
+        x = (Application.width // 2) + x - (w // 2)
+        y = (Application.height // 2) + y - (3 * h) # (3 * h) for aesthetic reasons
 
         # set permanent dimensions of popup
         popup.minsize(width = w, height = h)
         popup.maxsize(width = w, height = h)
         
         # places popup onscreen
-        popup.geometry('%dx%d+%d+%d' % (w, h, x, y))
+        popup.geometry('{}x{}+{}+{}'.format(w, h, x, y))
 
 # put in class
 def setUnderline(self):
@@ -223,35 +227,130 @@ class AddButtons(Frame):
 # background, with a link to that submission.
 class CurrentImg(Frame):
 
-    def __init__(self, parent, controller):
-        Frame.__init__(self, parent)
-        self.link = "https://www.reddit.com/r/EarthPorn/comments/37vqde/"\
-                    "has_there_ever_been_a_more_badass_volcano_photo/"
+    HR, MIN = rp.Config.cycletime()
+    # converts hours and min to milliseconds 
+    # to be used by the tkinter after() fn
+    TIMER = int(HR * 3600000 + MIN * 60000)
 
-        # create the frame to hold the widgets
+    def __init__(self, parent, controller):
+        """
+            Packs the frames needed, and initiaties 
+            the updateFrame to continuously call itself
+        """
+        Frame.__init__(self, parent)
+        # pack frames/labels
         self.frame = Frame(self, width = 525, height = 400,\
                            bg = "magenta")
-        # link to submission of image
-        self.label = Label(self.frame, text="Title/link to submission:", 
-                           font = UNDERLINE, 
-                           fg=HYPERLINK, cursor = CURSOR)
-        self.label.pack(pady = (35, 10), padx = 10)
-        self.label.bind("<Button-1>", self.open_link)
-
-        # thumbnail of image currently set as background
-        self.photoLocation = "./images/placeholder400x400.png"
-                           # "./images/currentpic_square.png"
-        self.photo = PhotoImage(file = self.photoLocation)
-        self.photoLabel = Label(self.frame, image = self.photo)
-        
-        # pack frames/labels
         self.frame.pack_propagate(0)
+        self.frame.pack()
+         
+        self.get_past_img(parent)
+        self.updateTimer()
+        self.updateFrame(parent)
+
+    def open_link(self, link):
+        """
+            Opens the link provided in the default
+            webbrowser
+        """
+        webbrowser.open_new(link)
+
+    def get_past_img(self, parent):
+        """
+            looks up the most recent wallpaper set based on the
+            config file and passes that info to set_past_img
+        """
+        
+        image_name = rp.Config.lastImg()      
+        if image_name:
+            rp.log.debug("Last Wallpaper is: %s" % image_name) 
+            im = rp.DBImg(image_name)
+            try:
+                im.link
+            # Attribute Error is in case the image returned
+            # is incomplete
+            except AttributeError:
+                rp.log.debug("Attribute Error in get_past_img",
+                             exc_info = True)
+            self.set_past_img(im)
+
+    def set_past_img(self, im):
+        """
+            Creates the inner frame within the main frame of
+            CurrentImg and packs the picture thumbnail and title
+            into it.
+        """
+
+        # create subframe to pack widgets into, then destroy it
+        # later
+        self.image_name = im.image_name
+        self.subFrame = Frame(self.frame, width = 525, height = 410,\
+                              bg = "white")
+        self.subFrame.pack_propagate(0)
+        self.subFrame.pack()
+       
+        # create title link
+        self.linkLabel = Label(self.subFrame, text = im.title,
+                               font = UNDERLINE, wraplength = 500,
+                               fg = HYPERLINK, cursor = CURSOR)
+        self.linkLabel.pack(pady = (35, 10), padx = 10)
+        self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.link))
+        
+   
+        # create image and change to thumbnail
+        imThumb = Image.open(im.save_location)
+        im.image_name = self.strip_file_ext(im.image_name)
+        im.image_name = self.add_png(im.image_name)
+        im.updateSaveLoc()
+        imThumb.thumbnail((400, 250), Image.ANTIALIAS)
+        imThumb.save(im.save_location, "PNG")
+        # apply photolabel to page to display
+        self.photo = PhotoImage(file = im.save_location)
+        self.photoLabel = Label(self.subFrame, image = self.photo)
         self.photoLabel.pack(side = "bottom", expand = True)
-        self.frame.pack(side = "top")
 
-    def open_link(self, event):
-        webbrowser.open_new(self.link)
+    def strip_file_ext(self, image_name):
+        """
+            Used to remove the .jpg or other ending from im.image_name
+            so that we can resave the thumbnail with .png
+        """
+        index = image_name.rfind('.')
+        image_name = image_name[:index]
+        return image_name
 
+    def add_png(self, image_name):
+        """
+            Appends the .png to the end of im.image_name to save the
+            thumbnail with .png
+        """
+        image_name += ".png"
+        return image_name
+
+    def delSubframe(self):
+        """
+            Clears up the widgets that are in the frame of the main
+            CurrentImg, so that we can reset all the widgets
+        """
+        self.photoLabel.destroy()
+        self.linkLabel.destroy()
+        self.subFrame.destroy()
+
+    def updateFrame(self, parent):
+        """
+            Calls itself to update the frame every self.TIMER 
+            to update the past image if it has changed
+        """
+        if self.image_name != rp.Config.lastImg():
+            self.updateTimer()
+            self.delSubframe()
+            self.get_past_img(parent)
+        self.after(self.TIMER, lambda: self.updateFrame(parent))
+
+    def updateTimer(self):
+        HR, MIN = rp.Config.cycletime()
+        # converts hours and min to milliseconds 
+        # to be used by the tkinter after() fn
+        self.TIMER = int(HR * 3600000 + MIN * 60000)
 
 # **** Past Images Page **** #
 # Gives a listing of past submissions, with a smaller thumbnail of the image
@@ -509,9 +608,15 @@ class Settings(Frame):
         self.values['--nsfw'] = self.onOff.get()
         self.values['-s'] = self.subreddits.get().replace(" ", "+")
         self.values['-dl'] = self.dlLoc.get()
-        totalTime = self.ctHourE.get() * 60 + self.ctMinE.get()
+        # convert hours to minutes, then add it to minutes, so we 
+        # are only dealing with total minutes in the end
+        totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
         self.values['-t'] = totalTime
         self.values['-c'] =  self.catVar.get().lower()
+        
+        CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +\
+                           float(self.ctMinE.get()) * 60000)
+
         return self.values 
 
     
@@ -613,10 +718,6 @@ class About(Frame):
         self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get(),
                                wraplength = 480)
 
-
-        
-        
-        
         # packs/binds
         # author frame pack
         self.authorTxt.pack(side = "left", padx = (60, 0))
@@ -656,6 +757,5 @@ class About(Frame):
         return os.path.realpath("CrashReport.log")
 
 if __name__ == "__main__":
-    rp.Config_logging()
     app = Application()
     app.mainloop()
