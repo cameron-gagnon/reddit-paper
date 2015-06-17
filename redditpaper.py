@@ -231,19 +231,20 @@ class DBImg():
         cur = sql.cursor()
         
         try:
-            cur.execute('SELECT ImgTitle, ImgLink, Width, Height\
+            cur.execute('SELECT ImgTitle, ImgLink, ImgPost, Width, Height\
                                   FROM oldposts WHERE ImgName=?',
                                   [image_name])
         
             result = cur.fetchone()
             self.title = result[0]
             self.link = result[1]
-            self.width = result[2]
-            self.height = result[3]
+            self.post = result[2]
+            self.width = result[3]
+            self.height = result[4]
             self.image_name = image_name
             self.save_location = DOWNLOADLOCATION + self.image_name
         except (sqlite3.OperationalError, TypeError):
-            pass
+            log.debug("Error occured in making a DBImg()", exc_info = True) 
 
     def setResolution(self):
         self.resolution = self.width + 'x' + self.height
@@ -305,19 +306,26 @@ class Database():
     #MODIFIES database of id's already downloaded
     #EFFECTS  Inserts the submission id into the database after a 
     #         successful download
-    def Insert_ImgDB(im, width, height):
-        log.debug("Data to insert\n\t\t\t\t\t\t  id: %s"\
-                  "\n\t\t\t\t\t\t  image_name: %s"\
-                  "\n\t\t\t\t\t\t  title: %s"\
-                  "\n\t\t\t\t\t\t  Post: %s"\
-                  "\n\t\t\t\t\t\t  link: %s"\
-                  "\n\t\t\t\t\t\t  width: %s"\
-                  "\n\t\t\t\t\t\t  height: %s",
-                  im.id, im.image_name, im.title, im.post, im.link,
-                  width, height) 
-        cur.execute('INSERT INTO oldposts VALUES(?, ?, ?, ?, ?, ?, ?)',\
-                    [im.id, im.image_name, im.title, im.post, im.link, 
-                     width, height])
+    def Insert_ImgDB(im):
+        log.debug("Data to insert\n\t\t\t\t\t\t  id: %s"
+                  "\n\t\t\t\t\t\t  image_name: %s"
+                  "\n\t\t\t\t\t\t  title: %s"
+                  "\n\t\t\t\t\t\t  Post: %s"
+                  "\n\t\t\t\t\t\t  link: %s",
+                  im.id, im.image_name, im.title, im.post, im.link) 
+        cur.execute('INSERT INTO oldposts (ID, ImgName, ImgTitle,\
+                     ImgPost, ImgLink) VALUES (?, ?, ?, ?, ?)',
+                    [im.id, im.image_name, im.title, im.post, im.link])
+        sql.commit()
+
+    # REQUIRES: valid width/heights to be updated in DB
+    # MODIFIES: width and height of specified image
+    # EFFECTS:  updates DB with width and height of image
+    def updateWH(im, width, height):
+        log.debug("Updating %s with width: %s and height: %s" %\
+                  (im.image_name, width, height))
+        cur.execute('UPDATE oldposts SET Width=?, Height=? WHERE ImgName=?', 
+                    [width, height, im.image_name])
         sql.commit()
 
 
@@ -408,7 +416,6 @@ class Config():
             log.debug("Settings.conf does not exist.")
             return False
         else:
-            log.debug("Settings.conf exists.")
             return config
 
     def read_config():
@@ -932,16 +939,16 @@ def Already_downloaded(im):
 
     log.debug("Result of Already_downloaded is: %s", result)
     
-    if result and not Check_width_height(im.id):
+    if result: 
+#and not Check_width_height(im.id):
         return True
     
-    elif result: # need to add check here that file is actually downloaded
+#elif result: # need to add check here that file is actually downloaded
                  # instead of basing it on past min-width/min-height requirements
                  # as those might have changed when running program again
         log.info("Picture: %s is already downloaded, will not "
-                 "download again unless "
-                 "forced to.", im.image_name)
-        return True
+                 "download again.", im.image_name)
+#return True
     else:
         return False            
 
@@ -960,18 +967,18 @@ def Valid_width_height(im):
         result1 = result[0][0]
         result2 = result[0][1]
         # 'erases' unwanted characters in the title
-        result1 = re.sub("[^\d\.]", "", result1)
-        result2 = re.sub("[^\d\.]", "", result2)
+        width = re.sub("[^\d\.]", "", result1)
+        height = re.sub("[^\d\.]", "", result2)
         
         log.debug("Width: %s \n\t\t\t\t\t\t  Height: %s", result1, result2)
-        
-        Database.Insert_ImgDB(im, result1, result2)         
+       
+        Database.updateWH(im, width, height)
         return Lookup_width_height(im)
 
     except IndexError:
-        log.debug("The title of the submission does not appear"
-                  " to contain the width and height of the image.")
-
+        log.debug("The title of the submission does not appear "
+                  "to contain the width and height of the image.")
+        return False
 
 ####################################################################
 #REQUIRES width, height from valid id in database
@@ -1009,25 +1016,25 @@ def Check_width_height(id):
 #MODIFIES nothing
 #EFFECTS  Returns true if the width and height are above specified
 #         dimensions
-def PIL_width_height(image_name):
+def PIL_width_height(im):
+    # get size of image by checking it after it has already downloaded
+    with open(DOWNLOADLOCATION + im.image_name, 'rb') as file:
+        image = Image.open(file)
+        width, height = image.size
+
     try: 
-        # get size of image by checking it after it has already downloaded
-        with open(DOWNLOADLOCATION + image_name, 'rb') as file:
-            image = Image.open(file)
-            width, height = image.size
-
-        cur.execute('UPDATE oldposts SET Width=?, Height=? WHERE ImgName=?', 
-                    [width, height, image_name])
-        sql.commit()
-
         if ((int(width) >= MINWIDTH) and \
             (int(height) >= MINHEIGHT)):
+            Database.updateWH(im, width, height)
             return True
+
         else:
+            Database.updateWH(im, width, height)
             return False
     except ValueError:
-        log.exception("Incorrect type comparison for width and height"
-                      " most likely an incorrect parsing of title.", exc_info=True)
+        log.exception("Incorrect type comparison for width and height "
+                      "most likely an incorrect parsing of title.", 
+                      exc_info=True)
 
 
 ####################################################################
@@ -1037,11 +1044,11 @@ def PIL_width_height(image_name):
 #         height requirements set by the user.
 def Lookup_width_height(im):
     if  Check_width_height(im.id):
-        log.info("Image: %s fits required size.", im.image_name)
+        log.debug("Image: %s fits required size.", im.image_name)
         return True
     else:
-        log.info("Image: %s does not fit required size. "
-                 "Will not download.", im.image_name)
+        log.debug("Image: %s does not fit required size. "
+                  "Will not download.", im.image_name)
         return False
 
 
@@ -1104,16 +1111,22 @@ def Main_photo_controller(r):
         log.debug("is_deviant: %s", is_deviant)
 
         if (not image_name or not url):
+            log.debug("Image name or url is bad, not downloading")
             MAXPOSTS -= 1
 
         elif (NSFW and im.nsfw):
+            log.debug("NSFW filter is on, and image is NSFW, not downloading")
+# consider inserting to database here as well? although this
+# shouldn't be an issue because if the filter is switched off, it will
+# not be already downloaded and the image will then get added to the DB
             MAXPOSTS -= 1
                         
         else:
             im.setImgName(image_name)
             # if it's already downloaded, we can just check width/height
             if not Already_downloaded(im):
-
+                Database.Insert_ImgDB(im) 
+                
                 # if it's not already downloaded, we must check the title
                 # for width and height, and then attempt a download. If
                 # the width/height is present and in range, and the 
@@ -1129,7 +1142,7 @@ def Main_photo_controller(r):
                 # If all these return true we can append the img to the list of
                 # images to set
                 elif is_deviant and Download_img(url, im) and\
-                        PIL_width_height(im.image_name):
+                     PIL_width_height(im):
                     
                     image_list.append(im)
                     # specifically for subs w/o WxH in title, but still
@@ -1167,7 +1180,6 @@ def Cycle_wallpaper():
         log.debug(image_list)
         for im in image_list:
             im.setAsWallpaper()
-            print(CYCLETIME)
             time.sleep(CYCLETIME*60)
     except IndexError:
         log.error("No posts appear to be in the specific "\

@@ -783,13 +783,6 @@ class About(Frame):
         # search for the log file
         return os.path.realpath("CrashReport.log")
 
-def make_settings():
-    print("In make settings")
-    setting = rp.Config.file_found()
-    if setting:
-        pass
-    else:
-        rp.Config.create(rp.Config.default_values)
 
 if __name__ == "__main__":
     app = Application()
