@@ -1,4 +1,5 @@
 #! /usr/bin/env python3.4
+
 import redditpaper as rp
 # must insert config here, so that it
 # works throughout both modules with onetime
@@ -227,10 +228,16 @@ class AddButtons(Frame):
 # background, with a link to that submission.
 class CurrentImg(Frame):
 
-    HR, MIN = rp.Config.cycletime()
-    # converts hours and min to milliseconds 
-    # to be used by the tkinter after() fn
-    TIMER = int(HR * 3600000 + MIN * 60000)
+    try: 
+        HR, MIN = rp.Config.cycletime()
+        # converts hours and min to milliseconds 
+        # to be used by the tkinter after() fn
+        TIMER = int(HR * 3600000 + MIN * 60000)
+    except ValueError:
+        # happens when program is run for first time as
+        # no config file is created yet
+        TIMER = 3000
+        pass
 
     def __init__(self, parent, controller):
         """
@@ -261,18 +268,22 @@ class CurrentImg(Frame):
             config file and passes that info to set_past_img
         """
         
-        image_name = rp.Config.lastImg()      
-        if image_name:
-            rp.log.debug("Last Wallpaper is: %s" % image_name) 
-            im = rp.DBImg(image_name)
+        self.image_name = rp.Config.lastImg()      
+        if self.image_name:
+            rp.log.debug("Last Wallpaper is: %s" % self.image_name) 
+
             try:
+                im = rp.DBImg(self.image_name)
                 im.link
+                self.set_past_img(im)
             # Attribute Error is in case the image returned
             # is incomplete
-            except AttributeError:
+            except (AttributeError, TypeError):
                 rp.log.debug("Attribute Error in get_past_img",
                              exc_info = True)
-            self.set_past_img(im)
+
+        else:
+            rp.log.debug("No image set as last image in settings.conf")
 
     def set_past_img(self, im):
         """
@@ -294,16 +305,20 @@ class CurrentImg(Frame):
                                font = UNDERLINE, wraplength = 500,
                                fg = HYPERLINK, cursor = CURSOR)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
-        self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.link))
+        self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
         
    
         # create image and change to thumbnail
-        imThumb = Image.open(im.save_location)
-        im.image_name = self.strip_file_ext(im.image_name)
-        im.image_name = self.add_png(im.image_name)
-        im.updateSaveLoc()
-        imThumb.thumbnail((400, 250), Image.ANTIALIAS)
-        imThumb.save(im.save_location, "PNG")
+        with open(im.save_location, 'rb') as image_file:
+            imThumb = Image.open(image_file)
+            # uses two with statements because of a bug
+            # in the PIL library that does not properly close
+            # a file
+            im.image_name = self.strip_file_ext(im.image_name)
+            im.image_name = self.add_png(im.image_name)
+            im.updateSaveLoc()
+            imThumb.thumbnail((400, 250), Image.ANTIALIAS)
+            imThumb.save(im.save_location, "PNG")
         # apply photolabel to page to display
         self.photo = PhotoImage(file = im.save_location)
         self.photoLabel = Label(self.subFrame, image = self.photo)
@@ -331,9 +346,13 @@ class CurrentImg(Frame):
             Clears up the widgets that are in the frame of the main
             CurrentImg, so that we can reset all the widgets
         """
-        self.photoLabel.destroy()
-        self.linkLabel.destroy()
-        self.subFrame.destroy()
+        try:
+            self.photoLabel.destroy()
+            self.linkLabel.destroy()
+            self.subFrame.destroy()
+        except AttributeError:
+            # happens when no image is set at first run of program
+            pass
 
     def updateFrame(self, parent):
         """
@@ -344,13 +363,21 @@ class CurrentImg(Frame):
             self.updateTimer()
             self.delSubframe()
             self.get_past_img(parent)
-        self.after(self.TIMER, lambda: self.updateFrame(parent))
+        try:
+            self.after(self.TIMER, lambda: self.updateFrame(parent))
+        except AttributeError:
+            # happens when settings.conf is not created yet
+            pass
 
     def updateTimer(self):
-        HR, MIN = rp.Config.cycletime()
-        # converts hours and min to milliseconds 
-        # to be used by the tkinter after() fn
-        self.TIMER = int(HR * 3600000 + MIN * 60000)
+        try:
+            HR, MIN = rp.Config.cycletime()
+            # converts hours and min to milliseconds 
+            # to be used by the tkinter after() fn
+            self.TIMER = int(HR * 3600000 + MIN * 60000)
+        except ValueError:
+            # happens when settings.conf is not created yet
+            pass
 
 # **** Past Images Page **** #
 # Gives a listing of past submissions, with a smaller thumbnail of the image
@@ -755,6 +782,14 @@ class About(Frame):
         # opens a file browser for the user to 
         # search for the log file
         return os.path.realpath("CrashReport.log")
+
+def make_settings():
+    print("In make settings")
+    setting = rp.Config.file_found()
+    if setting:
+        pass
+    else:
+        rp.Config.create(rp.Config.default_values)
 
 if __name__ == "__main__":
     app = Application()
