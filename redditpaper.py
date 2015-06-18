@@ -338,7 +338,7 @@ class Config():
                       'MINWIDTH': 1024,
                       'MINHEIGHT': 768,
                       'SUBREDDITS': "futureporn+earthporn+"
-                                    "technologyporn+spaceporn"
+                                    "technologyporn+spaceporn+"
                                     "imaginarystarscapes+lavaporn",
                       'CATEGORY': "hot",
                       'CYCLETIME' : 0.05,
@@ -1096,6 +1096,7 @@ def Main_photo_controller(r):
     log.debug("URL of query is %s", URL)
 
     i = 1        
+ 
     for post in r.get_content(url=URL, limit = MAXPOSTS):
         
         # creates image class which holds necessary data about post
@@ -1179,6 +1180,18 @@ def Cycle_wallpaper():
     try: 
         log.debug(image_list)
         for im in image_list:
+            try:
+                with open(im.save_location, 'rb') as image_file:
+                    Image.open(image_file)
+            except OSError:
+                # the debug message below explains this try/except
+                # block. the continue is so we continue through the
+                # for loop
+                log.debug("NOT SETTING WALLPAPER. LIKELY AN HTML "
+                          "FILE DUE TO NON DIRECT DOWNLOAD LINK "
+                          "FOR THE IMAGE!!! SAVING YOU FROM A "
+                          "BLACK SCREEN! HALLELUJAH!")
+                continue
             im.setAsWallpaper()
             time.sleep(CYCLETIME*60)
     except IndexError:
