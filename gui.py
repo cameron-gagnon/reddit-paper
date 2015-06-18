@@ -14,8 +14,9 @@ from tkinter import font
 from tkinter import StringVar
 from tkinter import ttk
 from PIL import Image
-
+from praw import errors
 FONT = "Verdana"
+MED_FONT = {FONT, "10"}
 LARGE_FONT = {FONT, "12"}
 XLARGE_FONT = {FONT, "16"}
 # TOFIX: H1 should be set to larger font
@@ -114,45 +115,116 @@ class AboutInfo():
         return AboutInfo._email
 
 
+class Message():
 
-class Messages():
-    """
-        Class of messages to be displayed when changes or errors occur
-    """
-    def confirm(master, cmd):
+    def __init__(self, master, title):
+        self.popup = Toplevel() 
+        self.popup.wm_title(title)
+    
+    def set_dimensions(self, master, w, h):
+        x = master.winfo_rootx()
+        y = master.winfo_rooty()
+        x = (Application.width // 2) + x - (w // 2)
+        y = (Application.height // 2) + y - 405#(3 * h) # (3 * h) for aesthetic reasons
+        # set permanent dimensions of popup
+        self.popup.minsize(width = w, height = h)
+        self.popup.maxsize(width = w, height = h)
+        self.popup.geometry('{}x{}+{}+{}'.format(w, h, x, y))
+ 
+    def destroy(self):
+        """
+            Destroys the popup
+        """
+        self.popup.destroy()
+
+    def pack_label(self, text, pady = 10):
+        label = ttk.Label(self.popup, anchor = "center",
+                          text = text, wraplength = 420,
+                          font = LARGE_FONT)
+        label.pack(side = "top", fill = "x", pady = pady)
+
+    def pack_button(self, pady = (10, 10)):
+        b = Button(self.popup, text = "Okay", command = self.destroy)
+        b.pack(side = "bottom", pady = pady)
+
+
+class ErrorMsg(Message):
+    
+    def __init__(self, master, text, title = "Error!"):
+        popup = Message.__init__(self, master, title) 
+        length = 0
+        height = 0
+        if isinstance(text, list):
+            if len(text) == 1:
+                # if string, return length of string
+                length = len(text[0])
+                height = 120
+                rp.log.debug("Length of error string is: %d, "
+                             "and height is: %d" % (length, height))
+            elif len(text) > 1:
+                # find max length of string in the list of errors
+                length = len(max(text))
+                # length of the list is num of elts in list 
+                # so to get the height, we take this and
+                # multiply it by a constant and add a base amt
+                height = len(text) * 15 + 130 
+                rp.log.debug("Length of  max error string is: %d " 
+                             "and height is %d" % (length, height))
+            else:
+                # no errors in CLArgs
+                pass 
+            self.pack_label("Invalid Argument(s):")
+        
+        else:
+            # if just a regular string that we want an error message
+            length = len(text) 
+            height = 125
+            self.pack_label("Invalid Argument(s):")
+            self.pack_label(text)
+            self.pack_button()
+            rp.log.debug("Length of error string is: %d, "
+                         "and height is: %d" % (length, height))
+ 
+        width = length * 5 + 200 # length * 5 because each char is probably 
+                                # about 5 px across. + 10 for padding
+        rp.log.debug("Width of ErrorMsg is %d: " % width)
+        self.set_dimensions(master, width, height)
+    
+
+class InvalidArg(ErrorMsg):
+
+    def __init__(self, master, text):
+        ErrorMsg.__init__(self, master, text)
+         
+        if len(text) > 1:
+            for string in text:
+                self.pack_label(string, pady = (5,0))
+        elif len(text) == 1:
+            self.pack_label(text[0])
+        else:
+            rp.log.debug("No errors in CLArgs")
+        self.pack_button() 
+
+class ConfirmMsg(Message):
+
+    def __init__(self, master, text):
         """
             Pop up box/message for confirmation of settings/deleting settings
         """
-        popup = Toplevel()
-        popup.wm_title("!! Confirm !!")
-        Messages.position_popup(popup, master)
-    
-        label = ttk.Label(popup, anchor = "center", 
-                          text = "Are you sure?", font = LARGE_FONT)
-        label.pack(side = "top", fill = "x", pady = 10)
-        B1 = ttk.Button(popup, text = "Yes", command = cmd)
-        B2 = ttk.Button(popup, text = "No", command = popup.destroy)
+        Message.__init__(self, master, "!! Confirm !!")
+        
+        width = 180
+        height = 75
+        self.set_dimensions(master, width, height)
+        
+        self.pack_label("Are you sure?")
+        BFrame = Frame(self.popup)
+        BFrame.pack()
+        B1 = ttk.Button(BFrame, text = "Yes", command = self.destroy)
+        B2 = ttk.Button(BFrame, text = "No", command = self.destroy)
         B1.pack(side = "left")
         B2.pack(side = "left")
 
-
-    def position_popup(popup, master):
-        """
-            places the popup centered on the application
-        """
-        # width of popup message
-        w = 155
-        h = 80
-        x, y = master.position_on_screen()
-        x = (Application.width // 2) + x - (w // 2)
-        y = (Application.height // 2) + y - (3 * h) # (3 * h) for aesthetic reasons
-
-        # set permanent dimensions of popup
-        popup.minsize(width = w, height = h)
-        popup.maxsize(width = w, height = h)
-        
-        # places popup onscreen
-        popup.geometry('{}x{}+{}+{}'.format(w, h, x, y))
 
 # put in class
 def setUnderline(self):
@@ -399,9 +471,9 @@ class PastImgs(Frame):
         # widgets inside the frames
         deleteSelButt = Button(buttFrame, text = "Delete selected", 
                                state = "disabled",
-                               command = lambda: Messages.confirm(self, None))
+                               command = lambda: ConfirmMsg(self, None))
         deleteAllButt = Button(buttFrame, text = "Delete all", 
-                               command = lambda: Messages.confirm(self, None))
+                               command = lambda: ConfirmMsg(self, None))
         
         yscrollbar = Scrollbar(self.canvas, orient = "vertical", width = 20)
        
@@ -475,13 +547,7 @@ class PastImgs(Frame):
     def findSavedPictures(self):
         pictures = rp.PictureList.list_pics()
         return pictures
-
-    def position_on_screen(self):
-        """
-            returns the x,y coordinates of upper left corner of frame
-        """
-        return self.winfo_rootx(), self.winfo_rooty()
-        
+       
 
 # **** Settings Page **** #
 # This is where most of the users choices will be made
@@ -635,27 +701,59 @@ class Settings(Frame):
         self.values['--nsfw'] = self.onOff.get()
         self.values['-s'] = self.subreddits.get().replace(" ", "+")
         self.values['-dl'] = self.dlLoc.get()
+        self.values['-c'] =  self.catVar.get().lower()
         # convert hours to minutes, then add it to minutes, so we 
         # are only dealing with total minutes in the end
-        totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
-        self.values['-t'] = totalTime
-        self.values['-c'] =  self.catVar.get().lower()
+        errors = self.test_values(self.values)
         
-        CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +\
-                           float(self.ctMinE.get()) * 60000)
+        try:
+            totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
+            self.values['-t'] = totalTime
+            CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +
+                                   float(self.ctMinE.get()) * 60000)
+        except ValueError:
+            errors.append(self.ctHourE.get())
+            errors.append(self.ctMinE.get())
 
-        return self.values 
+        return self.values, errors
 
-    
+    def test_values(self, values):
+        """
+            Returns a list of incorrectly entered
+            values from the settings page
+        """
+        # replace + with '' as we replaced ' ' with
+        # '+' and + is not considered an alnum
+        # so we remove it
+        subs = values['-s'].replace('+', '')
+
+        errors = []
+        if not str(values['-mw']).isdigit():
+            errors.append(values['-mw'])
+        if not str(values['-mh']).isdigit():
+            errors.append(values['-mh'])
+        if not subs.isalnum():
+            errors.append(values['-s'])
+
+        return errors
+
+
     def get_pics(self, event):
         """ 
-            Makes the call to redditpaper.main to
+            Makes the call to redditpaper.main() to
             start the wallpaper scraper part of the
             program. Also collects the values to
             start the program with.
         """
 
-        self.args = self.get_values()
+        self.args, errors = self.get_values()
+        if len(errors):
+            rp.log.debug("ERRORS from CLArgs is: %s",
+                          tuple(errors)) 
+            InvalidArg(self, errors)
+            return
+
+        rp.log.debug("No errors in CLArgs") 
         # check if any values are null/empty
         # if so, don't add them to the list 
         self.argList = os.getcwd() + "/redditpaper.py"
@@ -670,8 +768,12 @@ class Settings(Frame):
 
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
+        
         subprocess.Popen(self.argList.split())
-
+#        if e:
+#            rp.log.debug('Error code is: %s' % e)
+#            ErrorMsg(self, "Check the spelling of your "
+#                           "subreddits entered")
 
 # **** About Page **** #
 # Displays information regarding the creator of the application,
