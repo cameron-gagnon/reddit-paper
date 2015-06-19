@@ -15,16 +15,6 @@ from tkinter import StringVar
 from tkinter import ttk
 from PIL import Image
 from praw import errors
-FONT = "Verdana"
-MED_FONT = {FONT, "10"}
-LARGE_FONT = {FONT, "12"}
-XLARGE_FONT = {FONT, "16"}
-# TOFIX: H1 should be set to larger font
-# not same size as other font. Max font size?
-H1 = {FONT, "24"}
-CURSOR = "hand2"
-HYPERLINK = "#0000EE"
-
 
 
 class Application(Tk):
@@ -40,7 +30,7 @@ class Application(Tk):
         root = Frame(self, background="bisque")
         root.pack(side = "top", fill = "both", expand = True)
         
-        setUnderline(self) 
+        Fonts.underline(self) 
         # set minsize of application
         self.setUpWindow() 
         
@@ -58,7 +48,7 @@ class Application(Tk):
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         # frame to show on startup
-        self.show_frame(CurrentImg)
+        self.show_frame(PastImgs)#CurrentImg)
         
     def show_frame(self, page):
         """
@@ -81,7 +71,8 @@ class Application(Tk):
         self.y = (hs//2) - (self.height//2)
         self.minsize(width = self.width, height = self.height)
         self.maxsize(width = self.width, height = self.height)
-        self.geometry('{}x{}+{}+{}'.format(self.width, self.height, self.x, self.y))
+        self.geometry('{}x{}+{}+{}'.format(self.width, self.height, 
+                                           self.x, self.y))
 
 
 
@@ -115,17 +106,24 @@ class AboutInfo():
         return AboutInfo._email
 
 
+######################## Classes for Messages #################################
 class Message():
 
     def __init__(self, master, title):
+        """
+            Creates popup as Toplevel() and sets its title in the window 
+        """
         self.popup = Toplevel() 
         self.popup.wm_title(title)
     
     def set_dimensions(self, master, w, h):
+        """
+            Sets the position and size on screen for the popup 
+        """
         x = master.winfo_rootx()
         y = master.winfo_rooty()
         x = (Application.width // 2) + x - (w // 2)
-        y = (Application.height // 2) + y - 405#(3 * h) # (3 * h) for aesthetic reasons
+        y = (Application.height // 2) + y - 405
         # set permanent dimensions of popup
         self.popup.minsize(width = w, height = h)
         self.popup.maxsize(width = w, height = h)
@@ -138,12 +136,18 @@ class Message():
         self.popup.destroy()
 
     def pack_label(self, text, pady = 10):
+        """
+            Packs a label into the popup with the specified text
+        """
         label = ttk.Label(self.popup, anchor = "center",
                           text = text, wraplength = 420,
-                          font = LARGE_FONT)
+                          font = Fonts.LARGE)
         label.pack(side = "top", fill = "x", pady = pady)
 
     def pack_button(self, pady = (10, 10)):
+        """
+            Place a button at the bottom of the widget with the text "Okay"
+        """
         b = Button(self.popup, text = "Okay", command = self.destroy)
         b.pack(side = "bottom", pady = pady)
 
@@ -194,6 +198,10 @@ class ErrorMsg(Message):
 class InvalidArg(ErrorMsg):
 
     def __init__(self, master, text):
+        """
+            Used spcecifically to display the CLArguments            
+        """
+        
         ErrorMsg.__init__(self, master, text)
          
         if len(text) > 1:
@@ -204,6 +212,7 @@ class InvalidArg(ErrorMsg):
         else:
             rp.log.debug("No errors in CLArgs")
         self.pack_button() 
+
 
 class ConfirmMsg(Message):
 
@@ -225,21 +234,30 @@ class ConfirmMsg(Message):
         B1.pack(side = "left")
         B2.pack(side = "left")
 
+################################################################################
+class Fonts():
+    VERDANA = "Verdana"
+    CURSOR = "hand2"
+    HYPERLINK = "#0000EE"
+    XLARGE = {VERDANA, 16} 
+    LARGE = {VERDANA, 12}
+    MED = {VERDANA, 10}
+    H1 = {VERDANA, 25}
+    # TOFIX: H1 should be set to larger font
+    # not same size as other font. Max font size?
 
-# put in class
-def setUnderline(self):
-    """
-        Gives the ability to have entire strings of text
-        underlined. Used for links.
-    """
-    global UNDERLINE
+    def underline(master):
+        """
+            Gives the ability to have entire strings of text
+            underlined. Used for links.
+        """
+        global UNDERLINE
+        # Defined in its own function as the
+        # Font() call must be made after a Tk()
+        # instance has been created.
+        UNDERLINE = font.Font(master, Fonts.XLARGE)
+        UNDERLINE.configure(underline = True)
 
-    # Defined in its own global function as the
-    # Font() call must be made after a Tk()
-    # instance has been created.
-    UNDERLINE = font.Font(self, XLARGE_FONT)
-    UNDERLINE.configure(underline = True)
- 
 
 class StatusBar(Frame):
 
@@ -266,28 +284,28 @@ class AddButtons(Frame):
         # current image button
         self.cphoto = PhotoImage(file="./images/currentpic_square.png")
         self.c = Button(self.topbar, image = self.cphoto, 
-                        width = 125, height = 125, cursor = CURSOR,
+                        width = 125, height = 125, cursor = Fonts.CURSOR,
                         command = lambda: cls.show_frame(CurrentImg))
         self.c.grid(row = 0, column = 0, sticky = "N")
 
         # past image button
         self.pphoto = PhotoImage(file="./images/pastpic_square.png")
         self.p = Button(self.topbar, image = self.pphoto, 
-                        width = 125, height = 125, cursor = CURSOR,
+                        width = 125, height = 125, cursor = Fonts.CURSOR,
                         command = lambda: cls.show_frame(PastImgs))
         self.p.grid(row = 0, column = 1, sticky = "N")
 
         # settings buttons
         self.sphoto = PhotoImage(file="./images/settingpic_square.png")
         self.s = Button(self.topbar, image = self.sphoto, 
-                        width = 125, height = 125, cursor = CURSOR,
+                        width = 125, height = 125, cursor = Fonts.CURSOR,
                         command = lambda: cls.show_frame(Settings))
         self.s.grid(row=0, column = 2, sticky = "N")
 
         # about buttons
         self.aphoto = PhotoImage(file="./images/aboutpic_square.png")
         self.a = Button(self.topbar, image = self.aphoto, 
-                        width = 125, height = 125, cursor = CURSOR,
+                        width = 125, height = 125, cursor = Fonts.CURSOR,
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
 
@@ -374,8 +392,8 @@ class CurrentImg(Frame):
        
         # create title link
         self.linkLabel = Label(self.subFrame, text = im.title,
-                               font = UNDERLINE, wraplength = 500,
-                               fg = HYPERLINK, cursor = CURSOR)
+                               font = UNDERLINE, fg = Fonts.HYPERLINK,
+                               cursor = Fonts.CURSOR, wraplength = 500)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
         self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
         
@@ -460,47 +478,85 @@ class PastImgs(Frame):
 
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
-        # frames for past images page
+       
+        # select all box
         onOffVar = IntVar()
-        self.picFrame = Frame(self, bg = "blue", width = 500, height = 340)
-        self.canvas = Canvas(self.picFrame)
-        self.picListFrame = Frame(self.canvas, width = 400, height = 300)
-        buttFrame = Frame(self.picFrame, bg = "pink")
         selectBox = Checkbutton(self, text = "Select all",  variable = onOffVar)
+        selectBox.pack(anchor = "w", pady = (15, 2), padx = (21, 10))
+        ### begin canvas/frame/picture list
+        self.picFrame = Frame(self, bg = "blue", width = 450, height = 300)
+        self.picFrame.pack()
+        self.picFrame.bind("<MouseWheel>", self.onMouseWheel) 
+        self.picFrame.bind("<Button-3>", self.onMouseWheel)
+        self.picFrame.bind("<Button-5>", self.onMouseWheel)
+        self.canvas = Canvas(self.picFrame, bg = 'red', width = 450, height = 300)
+        self.canFrame = Frame(self.canvas)
+        self.canFrame.bind("<Configure>", self.setFrame)
+        self.canFrame.bind("<Button-4>", self.onMouseWheel)
+        self.canvas.bind("<Button-5>", self.onMouseWheel)
+#self.canvas.bind("<MouseWheel>", self.onMouseWheel)
+        self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
+ 
+        self.scroll = Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
+        self.canvas.configure(yscrollcommand = self.scroll.set)
+         
+        self.scroll.pack(side="right",fill="y")
+        self.canvas.pack(side="left")
         
-        # widgets inside the frames
-        deleteSelButt = Button(buttFrame, text = "Delete selected", 
+        for i in range(0, 15): 
+            self.foo = Frame(self.canFrame, width = 450, height = 75, bg = 'pink')
+            txt = "test {}".format(i)
+            self.text = Label(self.foo, text = txt) 
+            self.text.pack()
+            self.text.pack()
+            self.foo.grid(row = i, column = 0)
+            self.foo.pack_propagate(0)
+            self.setKeyBinds()
+        
+        ### end canvas/frame/picture list
+#self.scroll.grid_forget()
+         
+        # bottom frame for buttons
+        self.bottomFrame = Frame(self, bg = 'yellow')        
+        deleteSelButt = Button(self.bottomFrame, text = "Delete selected", 
                                state = "disabled",
                                command = lambda: ConfirmMsg(self, None))
-        deleteAllButt = Button(buttFrame, text = "Delete all", 
+        deleteAllButt = Button(self.bottomFrame, text = "Delete all", 
                                command = lambda: ConfirmMsg(self, None))
         
-        yscrollbar = Scrollbar(self.canvas, orient = "vertical", width = 20)
-       
-#self.populate(picListFrame)
- 
         # 'delete all' button 'delete selected' button
-        deleteAllButt.pack(side = "right", anchor = "se", padx = 10)
-        deleteSelButt.pack(side = "right", anchor = "se", padx = 10)
+        deleteAllButt.pack(side = "right")
+        deleteSelButt.pack(side = "right", padx = (10, 0))
 
         # packs the frame that holds the delete buttons
-        buttFrame.pack(side = "bottom", anchor = "e")
-        # pack the canvas
-        self.canvas.pack()
-        # pack frames/labels
-        # select and delete text
-        selectBox.pack(anchor = "w", pady = (15, 2), padx = (15, 10))
-        
-        # scrollbar for past images
-        yscrollbar.pack(side = "right", fill = "y")
-        
-        # box to list items
-        self.picListFrame.pack(side = "left", fill = "both")
+        self.bottomFrame.pack(side = "bottom", anchor = "e",
+                              pady = (0, 15), padx = (0, 27))
 
-        # frame to hold widgets
-        self.picFrame.pack(side = "bottom", padx = 10, pady = (0, 10))
+    def setKeyBinds(self):
+        self.foo.bind("<Button-4>", self.onMouseWheel)
+        self.foo.bind("<Button-5>", self.onMouseWheel)
+        self.foo.bind("<Up>", self.onMouseWheel)
+        self.foo.bind("<Down>", self.onMouseWheel)
+        self.foo.focus_set()
+   
+    def onMouseWheel(self, event):
+        keyNum = {116 : 2,   # Down arrow key
+                  111 : -2}  # Up arrow key
+        scrollVal = None
+        if event.keycode in keyNum:
+            scrollVal = keyNum.get(event.keycode)
+        elif event.num == 4:
+            scrollVal = -2
+        elif event.num == 5:
+            scrollVal = 2
+        else:
+            scrollVal = event.delta # leave as is on OSX
 
-        yscrollbar.config(command = self.canvas.yview)        
+        rp.log.debug("Scrolling by %d" % scrollVal)
+        self.canvas.yview_scroll(scrollVal, "units")
+
+    def setFrame(self, event):
+        self.canvas.configure(scrollregion = self.canvas.bbox('all'), width = 450, height = 300)
 
     def delete_all(self):
         """ 
@@ -528,7 +584,7 @@ class PastImgs(Frame):
         """
         savedPictures = self.findSavedPictures()
 
-        for img in savedPictures:
+        for i, img in enumerate(savedPictures):
             # create frame to hold information for one picture
             itemFrame = Frame(frame, width = 57, height = 20).pack(side = "top")
             
@@ -564,7 +620,7 @@ class Settings(Frame):
         # Frames
         temp = rp.Config.read_config()
         Frame.__init__(self, parent)
-        label = Label(self, text="Settings", font = H1, bg="yellow")
+        label = Label(self, text="Settings", font = Fonts.H1, bg="yellow")
         label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
         # subreddit border
@@ -787,7 +843,7 @@ class About(Frame):
         Frame.__init__(self, parent)
        
         # frames
-        label = Label(self, text="About", font = H1, bg="green")
+        label = Label(self, text="About", font = Fonts.H1, bg="green")
         label.pack(pady = 10, padx = 10)
         self.authorFrame = LabelFrame(self, text = "Author")
         self.donateFrame = LabelFrame(self, text = "Donations")
@@ -799,41 +855,41 @@ class About(Frame):
         # author
         self.authorTxt = Label(self.subAuthorFrame,
                                text = "This program was created by: ",\
-                               font = XLARGE_FONT)
+                               font = Fonts.XLARGE)
         self.authorLink = Label(self.subAuthorFrame, text="/u/camerongagnon", 
-                                font = UNDERLINE, 
-                                fg=HYPERLINK, cursor = CURSOR)
+                                font = UNDERLINE, fg = Fonts.HYPERLINK,
+                                cursor = Fonts.CURSOR)
 
         # version number
         self.vNum = StringVar()
         self.vNum.set("Version: " + rp.AboutInfo.version() + "." +
                       AboutInfo.version())
         self.version = Label(self.versionFrame, text = self.vNum.get(),
-                             font = XLARGE_FONT)
+                             font = Fonts.XLARGE)
         
         # donate text/link
         self.donateTxt = Label(self.donateFrame,
                                text = "If you enjoy this program, "
                                       "please consider making a donation ",
-                               font = XLARGE_FONT)
+                               font = Fonts.XLARGE)
         self.subDonateFrame = Frame(self.donateFrame)
         self.donateTxt2 = Label(self.subDonateFrame,
                                 text = "to the developer at the following "
                                        "link,",
-                                font = XLARGE_FONT) 
+                                font = Fonts.XLARGE) 
         self.donateLink = Label(self.subDonateFrame, text = "here.",
-                                fg = HYPERLINK, font = UNDERLINE, 
-                                cursor = CURSOR)
+                                font = UNDERLINE, fg = Fonts.HYPERLINK,
+                                cursor = Fonts.CURSOR) 
 
         # feedback
         self.feedback = Label(self.feedFrame,
                               text = "To provide comments/feedback, please "
                                      "do one of the following: \n"
                                      "1. Go to /r/reddit_paper and create a "
-                                     "new post.\n2. Follow the above "
-                                     "account link and send me a PM.\n3. Email "
+                                     "new post.\n2. Follow the account "
+                                     "link at the top and send me a PM.\n3. Email "
                                      "me directly at cameron.gagnon@gmail.com",\
-                              font = XLARGE_FONT)
+                              font = Fonts.XLARGE)
         # send crashReport
         self.crash_loc = StringVar()
         self.location = self.get_crash_location()
@@ -843,7 +899,7 @@ class About(Frame):
                             text = "To send a crash report, please\n"
                             "browse to the location below and send the log\n"
                             "to cameron.gagnon@gmail.com.", 
-                            font = XLARGE_FONT)
+                            font = Fonts.XLARGE)
         self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get(),
                                wraplength = 480)
 
