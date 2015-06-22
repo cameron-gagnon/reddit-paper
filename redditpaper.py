@@ -99,7 +99,45 @@ def main():
 ####################################################################
 ### CLASS IMPLEMNTATIONS
 ####################################################################
-class Img():
+class BaseImg():
+
+    def setAsWallpaper(self):
+        """ 
+            Sets the image as the wallpaper. This is called toward the
+            end of the program, so the image_name, and save location
+            should be set.
+        """
+        log.debug("Trying to set wallpaper!")
+        try:                            
+            subprocess.call(args = SETWALLPAPER + self.image_name, 
+                            shell = True)
+            statusStr = "Wallpaper should be set to: %s" % (self.image_name)# for "\
+                        #"%d seconds" % (self.image_name, (CYCLETIME*60))
+            log.debug(statusStr)
+            
+            # sets the last wallpaper to the config file
+            config = Config.file_found()
+            if config:
+                config.set('Last Wallpaper', 'Wallpaper', self.image_name)
+                with open('settings.conf', 'w') as configfile:
+                    config.write(configfile)
+   
+
+#gui.STATUSBAR.setText(statusStr)
+#TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
+#TO FIX gui.AddButtons.setStatusText(statusStr)
+
+        except KeyboardInterrupt:
+                sys.exit(0)
+        except:
+            log.exception("Error setting wallpaper, it is likely the "
+                          "file path is not 100% correct. Make sure "
+                          "there is a foward slash at the end of the "
+                          "path in the SETWALLPAPER variable.", exc_info=True)
+            sys.exit(1)
+
+
+class Img(BaseImg):
     """
         Creates an img instance for each post found when returning
         content from reddit, encapsulates title, id, image name, etc.
@@ -144,41 +182,6 @@ class Img():
         # returns only past the last '/'
         self.image_name =  self.link[remove + 1:]
 
-    def setAsWallpaper(self):
-        """ 
-            Sets the image as the wallpaper. This is called toward the
-            end of the program, so the image_name, and save location
-            should be set.
-        """
-
-        try:                            
-            subprocess.call(args = SETWALLPAPER + self.image_name, 
-                            shell = True)
-            statusStr = "Wallpaper should be set to: %s for "\
-                        "%d seconds" % (self.image_name, (CYCLETIME*60))
-            log.debug(statusStr)
-            
-            # sets the last wallpaper to the config file
-            config = Config.file_found()
-            if config:
-                config.set('Last Wallpaper', 'Wallpaper', self.image_name)
-                with open('settings.conf', 'w') as configfile:
-                    config.write(configfile)
-            # push the image info to the GUI?
-   
-
-#gui.STATUSBAR.setText(statusStr)
-#TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
-#TO FIX gui.AddButtons.setStatusText(statusStr)
-
-        except KeyboardInterrupt:
-                sys.exit(0)
-        except:
-            log.exception("Error setting wallpaper, it is likely the "
-                          "file path is not 100% correct. Make sure "
-                          "there is a foward slash at the end of the "
-                          "path in the SETWALLPAPER variable.", exc_info=True)
-            sys.exit(1)
 
 ########################################################################
 class SingleImg(Img):
@@ -216,7 +219,7 @@ class SingleImg(Img):
 
 
 #######################################################################
-class DBImg():
+class DBImg(BaseImg):
     """
         Creates an encapsulation of data about previously downloaded
         images by looking it up in the database. This is called to create
@@ -227,8 +230,7 @@ class DBImg():
         self.setLookUpInfo(image_name)
 
     def setLookUpInfo(self, image_name):
-        sql = sqlite3.connect('wallpaper.db')
-        cur = sql.cursor()
+        sql, cur = Database.connect_to_DB()
         
         try:
             cur.execute('SELECT ImgTitle, ImgLink, ImgPost, Width, Height\
@@ -249,8 +251,8 @@ class DBImg():
     def setResolution(self):
         self.resolution = self.width + 'x' + self.height
 
-    def updateSaveLoc(self):
-        self.save_location = DOWNLOADLOCATION + self.image_name
+    def updateSaveLoc(self, image_name):
+        self.thumb_save_loc = DOWNLOADLOCATION + image_name
 
 ########################################################################
 class PictureList():
@@ -260,11 +262,19 @@ class PictureList():
     """
 
     def list_pics():
-        cur.execute('SELECT * FROM oldposts')
-        results = cur.fetchall()
+        sql, cur = Database.connect_to_DB() 
         image_list = []
+        
+        try:
+            cur.execute('SELECT * FROM oldposts')
+        except sqlite3.OperationalError:
+            log.debug("First time running program, "
+                      "no table 'oldposts' in DB file")
+            return image_list 
+
+        results = cur.fetchall()
         for image in results:
-            pic = DBImg(image[1])
+            pic = DBImg(image[1]) # image[1] is ImgName
             image_list.append(pic)
         return image_list
 
@@ -285,7 +295,7 @@ class Database():
         global cur
            
         log.info("Accessing database for submission ID's")
-        sql, cur = self.connect_to_DB() 
+        sql, cur = Database.connect_to_DB() 
         # create image database
         cur.execute('CREATE TABLE IF NOT EXISTS oldposts(ID TEXT,\
                      ImgName TEXT, ImgTitle TEXT, ImgLink TEXT,\
@@ -296,7 +306,7 @@ class Database():
 
 
     # connects to the wallpaper.db which holds the image info
-    def connect_to_DB(self):
+    def connect_to_DB():
         sql = sqlite3.connect('wallpaper.db')
         cur = sql.cursor()
         return sql, cur
