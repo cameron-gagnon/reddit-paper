@@ -62,7 +62,7 @@ class Application(Tk):
         if page is PastImgs:
             try:
                 frame.itemFrame.focus_set()
-            except _tkinter.TclError:
+            except:# (AttributeError):
                 # all images are likely deleted from
                 # the itemFrame
                 pass
@@ -335,17 +335,21 @@ class ImageFormat():
 
 class StatusBar(Frame):
 
+    TEXT = "Idle" 
     def __init__(self, master): 
-        # statusbar for bottom of application        
-        self.statusBar = Label(master, text = "asdf", bd=1,
+        # statusbar for bottom of application
+        self.text = StringVar()
+        self.text.set(self.TEXT)
+         
+        self.statusBar = Label(master, text = self.text.get(), bd=1,
                           relief = SUNKEN, anchor = "w")
-        
+         
         # pack the labels/frame to window
         self.statusBar.pack(side = "bottom", fill = "x", anchor = "w")
 
     def setText(self, text):
         rp.log.debug("Setting STATUSBAR text to: " + text)
-        self.statusBar.config(text = text)
+        self.TEXT = text
 
 
 class AddButtons(Frame):
@@ -383,7 +387,7 @@ class AddButtons(Frame):
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
 
-#        STATUSBAR = StatusBar(master)
+        StatusBar(master)
         self.topbar.pack(side = "top")
 
 
@@ -443,8 +447,7 @@ class CurrentImg(Frame, ImageFormat):
             # AttributeError is in case the image returned
             # is incomplete
             except (AttributeError, TypeError):
-                rp.log.debug("Attribute Error in get_past_img",
-                             exc_info = True)
+                rp.log.debug("Attribute Error in get_past_img")
 
         else:
             rp.log.debug("No image set as last image in settings.conf")
@@ -526,6 +529,7 @@ class CurrentImg(Frame, ImageFormat):
             # happens when settings.conf is not created yet
             pass
 
+
 # **** Past Images Page **** #
 # Gives a listing of past submissions, with a smaller thumbnail of the image
 # and the title/resolution of the images.
@@ -550,14 +554,16 @@ class PastImgs(Frame, ImageFormat):
         self.canFrame = Frame(self.canvas)
         self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
         self.canvas.pack(side="left")
- 
-        self.scroll = Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
-        self.canvas.configure(yscrollcommand = self.scroll.set)
-        self.scroll.pack(side="right", fill="y")
-        self.picFrame.bind("<Configure>", self.setFrame) 
+        self.setScroll() 
 
         # POPULATE CANVAS WITH IMAGES!!!!!!!!
-        self.populate(self.canFrame) 
+        self.picList = self.findSavedPictures()
+        # these lists save each checkbox and frame/photo so we can
+        # identify them later when they need to be destroyed
+        self.checkBoxes = []
+        self.frames = []
+        self.photos = []
+        self.populate(self.canFrame, self.picList) 
 
         # bottom frame for buttons
         self.bottomFrame = Frame(self, bg = 'yellow')        
@@ -571,6 +577,14 @@ class PastImgs(Frame, ImageFormat):
         self.bottomFrame.pack(side = "bottom", anchor = "e",
                               pady = (0, 15), padx = (0, 27))
         ### end canvas/frame/picture list
+
+        self.updatePastImgs()
+
+    def setScroll(self):
+        self.scroll = Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
+        self.canvas.configure(yscrollcommand = self.scroll.set)
+        self.scroll.pack(side="right", fill="y")
+        self.picFrame.bind("<Configure>", self.setFrame) 
 
     def setKeyBinds(self, widget):
     
@@ -600,12 +614,12 @@ class PastImgs(Frame, ImageFormat):
         else:
             scrollVal = event.delta # leave as is on OSX
 
-        rp.log.debug("Scrolling by %d" % scrollVal)
         self.canvas.yview_scroll(scrollVal, "units")
 
     def setFrame(self, event = None):
         """ Sets the canvas dimentions and the scroll area """
-        self.canvas.configure(scrollregion = self.canvas.bbox('all'), width = 450, height = 300)
+        self.canvas.configure(scrollregion = self.canvas.bbox('all'),
+                              width = 450, height = 300)
 
     def change_all(self, event):
         """
@@ -624,45 +638,82 @@ class PastImgs(Frame, ImageFormat):
         """
             Delete all frames that have their checkbox
             checked.
+            self.photos[i][0] file path to original img
+                              '/path/to/file/jkY32rv.jpg'
+            self.photos[i][1] file path to png thumbnail 
+                              '/path/to/file/jkY32rv_P.png'
+            self.photos[i][2] original img name 'jkY32rv.jpg' 
         """
         for i, box in enumerate(self.checkBoxes):
             if box.get():
-                # deletes frame and image from computer
-                self.frames[i].destroy()
-                #os.remove(self.photos[i][0]) 
-                rp.log.debug("Deleting image: %s AND %s" % (self.photos[i][0], self.photos[i][1]))
+                # deletes frame from canvas
+                try:
+                    self.frames[i].destroy()
+                except AttributeError:
+                    pass
+
+                canvasHeight = self.canvas.winfo_height()
+                self.canvas.configure(height = canvasHeight - 50,
+                                      scrollregion = self.canvas.bbox('all'))
+                # delete image from computer
+                try:
+                    os.remove(self.photos[i][0])
+                    os.remove(self.photos[i][1]) 
+                    imageC = self.remove_C(self.photos[i][0], self.photos[i][2])
+                    os.remove(imageC)
+                    rp.log.debug("Deleting image: %s AND %s" %
+                                (self.photos[i][0], self.photos[i][0]))
+                    rp.Database.del_img(self.photos[i][2])
+                except OSError:
+                    rp.log.debug("File not found when deleting...")
+                    pass
 
         # don't forget to destroy the popup!
         popup.destroy()
-        # reset frame size to adjust scrollbar size
-#        self.picFrame.bind("<Configure>", self.setFrame) 
-
        
+    def remove_C(self, photoPath, photo):
+        """
+            Formats the photo name so that the photo name is
+            the %PHOTONAME%_C.png and then prepend the file path
+            to the photo, as it does not contain the path
+        """
+        # take the .png off, add _C to it, then add .png
+        # back on
+        imageC = self.strip_file_ext(photo)
+        imageC += "_C"
+        imageC = self.add_png(imageC)
 
-    def populate(self, frame):
+
+        # retrieves the download location based on 
+        # other image
+        index = photoPath.rfind('/') + 1 
+        path = photoPath[:index]
+        imageC = path + imageC
+        
+        return imageC
+
+    def populate(self, frame, picList):
         """
             Fill the frame with more frames of the images
         """
-        savedPictures = self.findSavedPictures()
-        self.checkBoxes = []
-        self.frames = []
-        self.photos = []
-        for i, im in enumerate(savedPictures):
+        for i, im in enumerate(self.picList):
             try:
                 with open(im.save_location, 'rb') as image_file:
                     imThumb = Image.open(image_file)
-                    im.thumb_image = self.strip_file_ext(im.image_name)
-                    im.thumb_image += "_P"
-                    im.thumb_image = self.add_png(im.thumb_image)
-                    im.updateSaveLoc(im.thumb_image)
+                    im.thumb_name = self.strip_file_ext(im.image_name)
+                    im.thumb_name += "_P"
+                    im.thumb_name = self.add_png(im.thumb_name)
+                    im.updateSaveLoc(im.thumb_name)
                     imThumb.thumbnail((50, 50), Image.ANTIALIAS)
                     imThumb.save(im.thumb_save_loc, "PNG")
             except (FileNotFoundError, OSError):
                 # usually a file that is not an actual image, such
-                # as an html document 
-                self.checkBoxes.append("Skip check")
-                self.frames.append("Skip frame")
-                self.photos.append("Skip photo")
+                # as an html document, so we append dummy variables
+                # so that the indexes will align properly with the
+                # variables later
+                self.checkBoxes.append(BooleanVar())
+                self.frames.append("Dummy Frame")
+                self.photos.append("Dummy Var")
                 continue 
  
             # create frame to hold information for one picture
@@ -675,11 +726,14 @@ class PastImgs(Frame, ImageFormat):
             self.checkVar = BooleanVar()
             self.checkBoxes.append(self.checkVar)
             self.checkVar.set(False)
-            self.check = Checkbutton(self.itemFrame, variable = self.checkBoxes[i])
+            self.check = Checkbutton(self.itemFrame,
+                                     variable = self.checkBoxes[i])
             self.check.pack(side = "left", padx = 5)
-            
+           
+            # append to photos list to access later
+            self.photos.append((im.save_location, im.thumb_save_loc,
+                               im.image_name, im.thumb_name))
             # insert the thumbnail
-            self.photos.append((im.save_location, im.thumb_save_loc))
             self.photo = PhotoImage(file = im.thumb_save_loc)
             self.photoLabel = Label(self.itemFrame, image = self.photo)
             self.photoLabel.image = self.photo # keep a reference per the docs!
@@ -723,19 +777,8 @@ class PastImgs(Frame, ImageFormat):
             self.setKeyBinds(self.txtFrame)
             self.setKeyBinds(self.photoLabel)
             self.setKeyBinds(self.check)
-
-            
-            # resolution
-#            w = im.width
-#            h = im.height
-#            resTxt = "[" + str(w) + "x" + str(h) + "]"
-#            self.res = Label(self.txtFrame, text = resTxt)
-#            self.res.pack(side = "bottom", pady = 5)
-#            self.setKeyBinds(self.res)
-#            self.setKeyBinds(self.txtFrame)
-            ## end for loop
         
-       #self.itemFrame.focus_set() 
+        self.setKeyBinds(self.canvas) 
 
     def make_link(self, im):
         """ 
@@ -766,6 +809,36 @@ class PastImgs(Frame, ImageFormat):
         """ Opens the link in the default webbrowser """
         webbrowser.open_new(link)
 
+    def updatePastImgs(self):
+        """
+            Updates the past images with new ones that
+            may have been downloaded. Updates happen
+            every 5 seconds
+        """
+        # get list of all pictures
+        pictures = self.findSavedPictures()
+        newPicList = []
+        image_name_list = [pic.image_name for pic in self.picList]
+        # loop through each picture
+        for picture in pictures:
+            # if picture is not already displayed
+            # then it probably wasn't there before...
+            # so we add it to the list to be displayed
+            if picture.image_name not in image_name_list:
+                newPicList.append(picture)
+                self.picList.append(picture)
+
+        if len(newPicList):
+            rp.log.debug("New pictures are: %s\n", tuple(newPicList))
+        
+            # pass in the frame to pack the new pictures into 
+            self.populate(self.canFrame, newPicList)
+            self.scroll.destroy()
+            self.setFrame()
+            self.setScroll()
+
+        self.after(2000, lambda: self.updatePastImgs())
+
 
 # **** Settings Page **** #
 # This is where most of the users choices will be made
@@ -789,16 +862,31 @@ class Settings(Frame):
         self.subredditForm = LabelFrame(self, text = "Subreddits to pull from "\
                                                      "(whitespace separated)")
         # nsfw border
-        self.checksFrame = LabelFrame(self.top, text = "Adult Content")
+        self.midTop = Frame(self.top)
+        self.checksFrame = LabelFrame(self.midTop, text = "Adult Content")
         self.checks = Frame(self.checksFrame)
+        
         # width x height
         self.dimensions = LabelFrame(self.top, 
                                      text = "Picture Resolution")
         self.res = Frame(self.dimensions)
-        # cycletime and category border and frame
+
+        # maxposts
+        self.maxLabel = LabelFrame(self.midTop, text = "# of Posts")
+        self.maxFrame = Frame(self.maxLabel)
+        self.maxTxt = Label(self.maxFrame, text = "Maxposts:")
+        self.maxTxt.pack(side = "left", padx = (5, 0))
+        self.maxE = Entry(self.maxFrame, width = 3)
+        self.maxE.insert(0, rp.Config.maxposts())
+        self.maxE.pack(side = "left", padx = (5,5), pady = (0, 5))
+        self.maxFrame.pack()
+
+        # cycletime border and frame
         self.topRt = Frame(self.top)
         self.ct = LabelFrame(self.topRt, text = "Wallpaper Timer")
         self.ctFrame = Frame(self.ct)
+        
+        # category border and frame
         self.cat = LabelFrame(self.topRt, text = "Section")
         self.catFrame = Frame(self.cat, width = 200, height = 30)
         self.catFrame.pack_propagate(0)
@@ -892,7 +980,7 @@ class Settings(Frame):
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
-        self.top.pack(side = "top", anchor = "w", pady = (10, 0))
+        self.top.pack(side = "top", anchor = "w", pady = (10, 10))
         self.subredditForm.pack(side = "top", anchor = "w",\
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
@@ -900,15 +988,19 @@ class Settings(Frame):
         self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
                              padx = (15, 5))
         self.res.pack(side = "top")
+        self.midTop.pack(side = "left", padx = 4) 
         self.checks.pack(side = "top")
-        self.checksFrame.pack(side = "left", anchor = "nw",\
+        self.checksFrame.pack(side = "top", anchor = "nw",\
                          padx = (5, 5))
+        self.maxLabel.pack(side = "top")
         # cycletime and category frame
         self.ct.pack(side = "top")
         self.cat.pack(side = "bottom")
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-
+    def maxPosts(self):
+        pass
+        
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -918,6 +1010,8 @@ class Settings(Frame):
         self.values['-s'] = self.subreddits.get().replace(" ", "+")
         self.values['-dl'] = self.dlLoc.get()
         self.values['-c'] =  self.catVar.get().lower()
+        self.values['-mp'] = self.maxE.get()
+
         # convert hours to minutes, then add it to minutes, so we 
         # are only dealing with total minutes in the end
         errors = self.test_values(self.values)
@@ -948,6 +1042,9 @@ class Settings(Frame):
             errors.append(values['-mw'])
         if not str(values['-mh']).isdigit():
             errors.append(values['-mh'])
+        if not str(values['-mp']).isdigit() or\
+           int(values['-mp']) > 99:
+            errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
 
