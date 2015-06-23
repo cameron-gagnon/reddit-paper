@@ -90,8 +90,10 @@ def main():
         # this is printed for ease of use when viewing the debug file
         log.debug("################################################"
                   "################################################\n")
+        Config.writeStatusBar("")
     except KeyboardInterrupt:
         log.info("CTRL + C entered from command line, exiting...")
+        Config.writeStatusBar("")
         sql.close()
         sys.exit(0)
 
@@ -107,12 +109,13 @@ class BaseImg():
             end of the program, so the image_name, and save location
             should be set.
         """
-        log.debug("Trying to set wallpaper!")
         try:                            
             subprocess.call(args = SETWALLPAPER + self.image_name, 
                             shell = True)
-            statusStr = "Wallpaper should be set to: %s" % (self.image_name)# for "\
-                        #"%d seconds" % (self.image_name, (CYCLETIME*60))
+            hr, min_ = Config.cycletime() 
+            statusStr = "Wallpaper should be set to: %s for %d hours "\
+                        "and %.2f minutes" % (self.image_name, hr, min_)
+            Config.writeStatusBar(statusStr) 
             log.debug(statusStr)
             
             # sets the last wallpaper to the config file
@@ -204,15 +207,17 @@ class SingleImg(Img):
     
         try:
             picdl = urllib.request.urlopen(picdl)
-    
+        
         except urllib.error.HTTPError:
             log.exception("Could not open the specified picture webpage!!\n",
                           exc_info = True)
+            Config.writeStatusBar("Error downloading %s" % SINGLELINK)
             sys.exit(0)
     
         log.info("Downloading: %s \n\t\t\t\t\t\t  as: %s "\
                  "\n\t\t\t\t\t\t  to: %s",
                  self.link, self.image_name, self.save_location)
+        Config.writeStatusBar("Downloading %s" % SINGLELINK)
         
         with open(self.save_location, "wb") as picfile:
             picfile.write(picdl.read())
@@ -350,6 +355,7 @@ class Database():
         cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
         sql.commit()
 
+
 ###########################################################################
 class Config():
     """
@@ -365,7 +371,8 @@ class Config():
                       'CYCLETIME' : 0.05,
                       'MAXPOSTS': 5,
                       'NSFW': False,
-                      'WALLPAPER': ''
+                      'WALLPAPER': '',
+                      'STATUSBAR': 'Idle'
                      }
     
     def config(args):
@@ -379,6 +386,8 @@ class Config():
         args['NSFW'] = Config.convert_NSFW(args['NSFW'])
 
         config = configparser.ConfigParser()
+        config['Statusbar'] = OrderedDict([('Statusbar Text',
+                                            args['STATUSBAR'])])
         config['Save Location'] = OrderedDict([('Directory',
                                                 args['DOWNLOADLOCATION'])])
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
@@ -405,7 +414,7 @@ class Config():
             args['WALLPAPER'] = Config.lastImg()
             config['Last Wallpaper'] = OrderedDict([('Wallpaper',
                                                      args['WALLPAPER'])])
-
+    
         with open('settings.conf', 'w') as configfile:
             config.write(configfile)
 
@@ -556,7 +565,21 @@ class Config():
             lastImg = config.get('Last Wallpaper', 'Wallpaper')
             return lastImg
         return ""
+    
+    def statusBar():
+        config = Config.file_found()
+        if config:
+            statusText = config.get('Statusbar', 'Statusbar Text')
+            return statusText
+        return ""
 
+    def writeStatusBar(statusText):
+        config = Config.file_found()
+        if config:
+            config['Statusbar'] = OrderedDict([('Statusbar Text',
+                                                statusText)])
+            with open('settings.conf', 'w+') as configfile:
+                config.write(configfile)
 
 ####################################################################
 ### FUNCTION IMPLEMENTATIONS
@@ -611,14 +634,18 @@ def Connected(url):
         content = url.read().decode('utf-8')
         json.loads(content)
         url.close()
+        Config.writeStatusBar("Connecting to Reddit...") 
     # Error that usually occurs when there is no internet connection        
     except URLError as e:
+        Config.writeStatusBar("Not connected to the internet.") 
         log.error("Not connected to the internet. Check "
                   "your internet connection and try again.")
         log.debug("Error is: %s" % e)
         sys.exit(0)
 
     except (HTTPError, timeout, AttributeError, ValueError) as e:
+        Config.writeStatusBar("Not connected to reddit.com. Sign in to"
+                              "internet and try again.")
         log.error("You do not appear to be connected to Reddit.com."
                   " This is likely due to a redirect by the internet connection"
                   " you are on. Check to make sure no login is required and the"
@@ -1090,7 +1117,7 @@ def Download_img(url, im):
     # gets the pic download information and sets the download location
     picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
     log.debug("URL is: %s", url)
-
+    
     try:
         picdl = urllib.request.urlopen(picdl)
 
@@ -1102,7 +1129,7 @@ def Download_img(url, im):
     log.info("Downloading: %s \n\t\t\t\t\t\t  as: %s "\
              "\n\t\t\t\t\t\t  to: %s",
              url, im.image_name, im.save_location)
-    
+
     with open(im.save_location, "wb") as picfile:
         picfile.write(picdl.read())
     
@@ -1118,35 +1145,37 @@ def Main_photo_controller(r):
     global image_list
     global MAXPOSTS
     
-    log.info("Fetching subreddits from %s", SUBREDDITS)
-    log.info("Pulling top %s posts", MAXPOSTS)
+    Config.writeStatusBar("Fetching %s posts from specified"
+                          "subreddits" % MAXPOSTS)
+    log.debug("Fetching subreddits from %s", SUBREDDITS)
+    log.debug("Pulling top %s posts", MAXPOSTS)
     log.debug("URL of query is %s", URL)
 
     i = 1        
  
-    for post in r.get_content(url=URL, limit = MAXPOSTS):
+    for i, post in enumerate(r.get_content(url=URL, limit = MAXPOSTS), start = 1):
         
         # creates image class which holds necessary data about post
         im = Img(post)
-       
+        image_name, url, is_deviant = Title_from_url(im)
+
+        Config.writeStatusBar("Checking %d of %d images" % (i, MAXPOSTS)) 
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                   "\n\t\t\t\t\t\t  Link to Img: %s",
                   im.title, im.id, im.link)
-        
-        image_name, url, is_deviant = Title_from_url(im)
-        
         log.debug("is_deviant: %s", is_deviant)
 
         if (not image_name or not url):
-            log.debug("Image name or url is bad, not downloading")
+            txt = "Image name or url is bad, not downloading"
+            log.debug(txt)
+            Config.writeStatusBar(txt)
             MAXPOSTS -= 1
 
         elif (NSFW and im.nsfw):
-            log.debug("NSFW filter is on, and image is NSFW, not downloading")
-# consider inserting to database here as well? although this
-# shouldn't be an issue because if the filter is switched off, it will
-# not be already downloaded and the image will then get added to the DB
+            NSFWTxt = "NSFW filter is on, and image is NSFW, not downloading"
+            log.debug(NSFWTxt)
+            Config.writeStatusBar(NSFWTxt)
             MAXPOSTS -= 1
                         
         else:
@@ -1160,7 +1189,7 @@ def Main_photo_controller(r):
                 # the width/height is present and in range, and the 
                 # download is good, we can set the image as the background
                 if  Valid_width_height(im) and Download_img(url, im):
-
+                    
                     image_list.append(im)
                     log.debug("Image successfully downloaded with "
                               "WxH in title")
@@ -1204,6 +1233,8 @@ def Cycle_wallpaper():
     global image_list
     
     log.debug("NUM OF IMAGES IS: %s", len(image_list))
+    Config.writeStatusBar("%d images downloaded" % len(image_list))
+    
     try: 
         log.debug(image_list)
         for im in image_list:
@@ -1297,6 +1328,7 @@ def Parse_cmd_args():
     log.debug("NSFW is %s", args.nsfw)
     a['NSFW'] = args.nsfw
     a['DOWNLOADLOCATION'] = args.downloadLoc
+    a['STATUSBAR'] = "" 
     
     # declare as global so rest of program can see the values
     MINWIDTH   =  a['MINWIDTH'] 
