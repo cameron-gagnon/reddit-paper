@@ -19,7 +19,7 @@ from praw import errors
 
 class Application(Tk):
     width = 525
-    height = 550
+    height = 555
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
@@ -36,7 +36,8 @@ class Application(Tk):
         
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
-#        self.STATUSBAR = StatusBar(root)
+        
+        StatusBar(master)
         
         # window used to pack the pages into
         self.window = Frame(root, bg = "cyan")         
@@ -49,7 +50,6 @@ class Application(Tk):
 
         # frame to show on startup
         self.show_frame(PastImgs)#CurrentImg)
-        
     def show_frame(self, page):
         """
             Input: the page to display
@@ -335,21 +335,39 @@ class ImageFormat():
 
 class StatusBar(Frame):
 
-    TEXT = "Idle" 
     def __init__(self, master): 
+        Frame.__init__(self, master)
+        """
+            Represents the statusbar at the bottom of the application.
+            The statusbar is set up in AddButtons()
+            It reads from the settings.conf file to get the statusbar
+            text and then updates accordingly.
+            Executes after every second.
+        """
         # statusbar for bottom of application
         self.text = StringVar()
-        self.text.set(self.TEXT)
-         
+        self.text.set(rp.Config.statusBar())
         self.statusBar = Label(master, text = self.text.get(), bd=1,
                           relief = SUNKEN, anchor = "w")
          
         # pack the labels/frame to window
         self.statusBar.pack(side = "bottom", fill = "x", anchor = "w")
+        self.setText()
 
-    def setText(self, text):
-        rp.log.debug("Setting STATUSBAR text to: " + text)
-        self.TEXT = text
+    def setText(self):
+        """
+            Sets the text of the status bar to the string in the 
+            config file 'settings.conf' 
+        """
+        text = rp.Config.statusBar()
+        
+        if text == self.text:
+            pass
+        else:
+            self.text = text
+            self.statusBar.config(text = self.text)
+            
+        self.after(1000, lambda: self.setText())
 
 
 class AddButtons(Frame):
@@ -387,7 +405,6 @@ class AddButtons(Frame):
                         command = lambda: cls.show_frame(About))
         self.a.grid(row = 0, column = 3, sticky = "N")
 
-        StatusBar(master)
         self.topbar.pack(side = "top")
 
 
