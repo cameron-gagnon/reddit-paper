@@ -77,7 +77,7 @@ def main():
 #env = de.get_desktop_environment()
         
         # checks if a single link was entered by the user to download
-        Single_link()
+        Single_link(SINGLELINK)
         db = Database()    
         
         r = Connected("https://www.reddit.com/.json")
@@ -112,9 +112,8 @@ class BaseImg():
         try:                            
             subprocess.call(args = SETWALLPAPER + self.image_name, 
                             shell = True)
-            hr, min_ = Config.cycletime() 
-            statusStr = "Wallpaper should be set to: %s for %d hours "\
-                        "and %.2f minutes" % (self.image_name, hr, min_)
+            statusStr = "Wallpaper should be set to: %s " % (self.image_name)
+            
             Config.writeStatusBar(statusStr) 
             log.debug(statusStr)
             
@@ -194,8 +193,10 @@ class SingleImg(Img):
     def __init__(self, link):
         if link:
             self.setLink(link)
-            self.download(link)
-            self.setAsWallpaper()
+            flag = self.download(link)
+            
+            if flag:
+                self.setAsWallpaper()
 
     def download(self, link):
         """ Downloads the image to the save location  """
@@ -217,11 +218,16 @@ class SingleImg(Img):
         log.info("Downloading: %s \n\t\t\t\t\t\t  as: %s "\
                  "\n\t\t\t\t\t\t  to: %s",
                  self.link, self.image_name, self.save_location)
-        Config.writeStatusBar("Downloading %s" % SINGLELINK)
+        Config.writeStatusBar("Downloading %s" % link)
         
-        with open(self.save_location, "wb") as picfile:
-            picfile.write(picdl.read())
+        try:
 
+            with open(self.save_location, "wb") as picfile:
+                picfile.write(picdl.read())
+            return True
+
+        except FileNotFoundError:
+            return False
 
 #######################################################################
 class DBImg(BaseImg):
@@ -659,9 +665,9 @@ def Connected(url):
 ####################################################################
 #MODIFIES Downloads the image specified by the user 
 #EFFECTS  Sets image as wallpaper
-def Single_link():
-    if SINGLELINK:
-        SingleImg(SINGLELINK)
+def Single_link(link):
+    if link:
+        SingleImg(link)
 
 
 ####################################################################
@@ -1130,9 +1136,14 @@ def Download_img(url, im):
              "\n\t\t\t\t\t\t  to: %s",
              url, im.image_name, im.save_location)
 
-    with open(im.save_location, "wb") as picfile:
-        picfile.write(picdl.read())
-    
+    try:
+        with open(im.save_location, "wb") as picfile:
+            picfile.write(picdl.read())
+    except FileNotFoundError:
+        # image is likely from a foreign site with oddly formatted url's
+        # that made this fail when finding the file
+        return False
+
     return True
 
 
