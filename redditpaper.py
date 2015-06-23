@@ -246,7 +246,7 @@ class DBImg(BaseImg):
             self.image_name = image_name
             self.save_location = DOWNLOADLOCATION + self.image_name
         except (sqlite3.OperationalError, TypeError):
-            log.debug("Error occured in making a DBImg()", exc_info = True) 
+            log.debug("Error occured in making a DBImg()") 
 
     def setResolution(self):
         self.resolution = self.width + 'x' + self.height
@@ -270,6 +270,8 @@ class PictureList():
         except sqlite3.OperationalError:
             log.debug("First time running program, "
                       "no table 'oldposts' in DB file")
+            # return empty list so when iterating the fn 
+            # has no objects to iterate over
             return image_list 
 
         results = cur.fetchall()
@@ -338,6 +340,15 @@ class Database():
                     [width, height, im.image_name])
         sql.commit()
 
+    # REQUIRES: valid name in oldposts
+    # MODIFIES: oldposts DB table
+    # EFFECTS:  removes the image and its associated data from the
+    #           database.
+    def del_img(image_name):
+        sql, cur = Database.connect_to_DB()
+        log.debug("Deleting %s from database" % image_name)
+        cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
+        sql.commit()
 
 ###########################################################################
 class Config():
@@ -373,11 +384,10 @@ class Config():
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
                                          ('Minheight', args['MINHEIGHT']),
                                          ('Subreddits', args['SUBREDDITS']),
-                                         ('Category', args['CATEGORY'])])
+                                         ('Category', args['CATEGORY']),
+                                         ('Maxposts', args['MAXPOSTS'])])
         config['Cycletime'] = OrderedDict([('Hours', args['CYCLEHR']),
                                            ('Minutes', args['CYCLEMIN'])])
-        config['Max posts to check'] = OrderedDict([('Max posts',
-                                                     args['MAXPOSTS'])])
         config['Adult Content'] = OrderedDict([('NSFW', args['NSFW'])])
         # this try/except is used because the cmdline args come through here
         # and doesn't contain the wallpaper argument, so it is not always
@@ -456,7 +466,7 @@ class Config():
                                   "earthporn+imaginarystarscapes+spaceporn")
         args['MINWIDTH'] = config.getint('Options', 'Minwidth', fallback = 1024)
         args['MINHEIGHT'] = config.getint('Options', 'Minheight', fallback = 768)
-        args['MAXPOSTS'] = config.getint('Max posts to check', 'Max posts',
+        args['MAXPOSTS'] = config.getint('Options', 'Max posts',
                                  fallback = 5)
         args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes', fallback = 0.05)
         # must convert minutes and hours to only minutes as that's how the 
@@ -546,6 +556,7 @@ class Config():
             lastImg = config.get('Last Wallpaper', 'Wallpaper')
             return lastImg
         return ""
+
 
 ####################################################################
 ### FUNCTION IMPLEMENTATIONS
@@ -1009,6 +1020,7 @@ def Check_width_height(id):
             (int(height) >= MINHEIGHT)):
             return True
         else:
+            log.debug("RESOLUTION OF IMAGE DOES NOT MEET REQUIREMENTS")
             return False
 
     except ValueError:
@@ -1029,7 +1041,11 @@ def Check_width_height(id):
 def PIL_width_height(im):
     # get size of image by checking it after it has already downloaded
     with open(DOWNLOADLOCATION + im.image_name, 'rb') as file:
-        image = Image.open(file)
+        try:
+            image = Image.open(file)
+        except OSError:
+            return False
+
         width, height = image.size
 
     try: 
@@ -1040,6 +1056,7 @@ def PIL_width_height(im):
 
         else:
             Database.updateWH(im, width, height)
+            log.debug("RESOLUTION OF IMAGE DOES NOT MEET REQUIREMENTS")
             return False
     except ValueError:
         log.exception("Incorrect type comparison for width and height "
@@ -1077,7 +1094,7 @@ def Download_img(url, im):
     try:
         picdl = urllib.request.urlopen(picdl)
 
-    except urllib.error.HTTPError:
+    except (urllib.error.HTTPError, urllib.error.URLError):
         log.exception("ERROR: occured in Setting up the url!!\n",
                            exc_info=True)
         return False
