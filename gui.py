@@ -33,6 +33,9 @@ class Application(Tk):
         Fonts.underline(self) 
         # set minsize of application
         self.setUpWindow() 
+
+        # set docked icon in system tray
+        self.addIcon() 
         
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
@@ -68,7 +71,14 @@ class Application(Tk):
                 pass
 
         frame.tkraise()
+    
+
+    def addIcon(self):
+        self.img = PhotoImage(file = 'images/reddit.png')
+        self.tk.call('wm', 'iconphoto', self._w, self.img)
+
         
+
     def setUpWindow(self):
         """ 
             Aligns the GUI to open in the middle
@@ -118,15 +128,27 @@ class AboutInfo():
 
 
 ######################## Classes for Messages #################################
-class Message():
+class Message(Toplevel):
 
     def __init__(self, master, title):
         """
             Creates popup as Toplevel() and sets its title in the window 
         """
-        self.popup = Toplevel() 
-        self.popup.wm_title(title)
-    
+        Toplevel.__init__(self, master)
+        #self.popup = Toplevel() 
+        self.wm_title(title)
+        
+        # bit of a hack to ensure that the window has grab_set applied to it 
+        # this is because the window may not be there when self.grab_set() is
+        # called, so we wait until it happens without an error
+        while True:
+            try:
+                self.grab_set()
+            except TclError:
+                pass
+            else:
+                break
+
     def set_dimensions(self, master, w, h):
         """
             Sets the position and size on screen for the popup 
@@ -136,21 +158,22 @@ class Message():
         x = (Application.width // 2) + x - (w // 2)
         y = (Application.height // 2) + y - 405
         # set permanent dimensions of popup
-        self.popup.minsize(width = w, height = h)
-        self.popup.maxsize(width = w, height = h)
-        self.popup.geometry('{}x{}+{}+{}'.format(w, h, x, y))
+        self.minsize(width = w, height = h)
+        self.maxsize(width = w, height = h)
+        self.geometry('{}x{}+{}+{}'.format(w, h, x, y))
  
-    def destroy(self):
+    def delete(self):
         """
             Destroys the popup
         """
-        self.popup.destroy()
+        self.grab_release()
+        self.destroy()
 
     def pack_label(self, text, pady = 10):
         """
             Packs a label into the popup with the specified text
         """
-        label = ttk.Label(self.popup, anchor = "center",
+        label = ttk.Label(self, anchor = "center",
                           text = text, wraplength = 420,
                           font = Fonts.L())
         label.pack(side = "top", fill = "x", pady = pady)
@@ -159,7 +182,7 @@ class Message():
         """
             Place a button at the bottom of the widget with the text "Okay"
         """
-        b = Button(self.popup, text = "Okay", command = self.destroy)
+        b = Button(self, text = "Okay", command = self.delete)
         b.pack(side = "bottom", pady = pady)
 
 
@@ -173,7 +196,7 @@ class ErrorMsg(Message):
             if len(text) == 1:
                 # if string, return length of string
                 length = len(text[0])
-                height = 120
+                height = 170
                 rp.log.debug("Length of error string is: %d, "
                              "and height is: %d" % (length, height))
             elif len(text) > 1:
@@ -181,8 +204,8 @@ class ErrorMsg(Message):
                 length = len(max(text))
                 # length of the list is num of elts in list 
                 # so to get the height, we take this and
-                # multiply it by a constant and add a base amt
-                height = len(text) * 15 + 130 
+                # multiply it by a constant and add a base amount
+                height = len(text) * 20 + 130 
                 rp.log.debug("Length of  max error string is: %d " 
                              "and height is %d" % (length, height))
             else:
@@ -200,7 +223,7 @@ class ErrorMsg(Message):
             rp.log.debug("Length of error string is: %d, "
                          "and height is: %d" % (length, height))
  
-        width = length * 5 + 200 # length * 5 because each char is probably 
+        width = length * 5 + 170 # length * 5 because each char is probably 
                                 # about 5 px across. + 10 for padding
         rp.log.debug("Width of ErrorMsg is %d: " % width)
         self.set_dimensions(master, width, height)
@@ -214,7 +237,7 @@ class InvalidArg(ErrorMsg):
         """
         
         ErrorMsg.__init__(self, master, text)
-         
+
         if len(text) > 1:
             for string in text:
                 self.pack_label(string, pady = (5,0))
@@ -238,10 +261,10 @@ class ConfirmMsg(Message):
         self.set_dimensions(master, width, height)
         
         self.pack_label("Are you sure?")
-        BFrame = Frame(self.popup)
+        BFrame = Frame(self)
         BFrame.pack()
         B1 = ttk.Button(BFrame, text = "Yes", command = lambda: master.del_sel(self))
-        B2 = ttk.Button(BFrame, text = "No", command = self.destroy)
+        B2 = ttk.Button(BFrame, text = "No", command = self.delete)
         B1.pack(side = "left")
         B2.pack(side = "left")
 
@@ -854,7 +877,7 @@ class PastImgs(Frame, ImageFormat):
             self.setFrame()
             self.setScroll()
 
-        self.after(2000, lambda: self.updatePastImgs())
+        self.after(1000, lambda: self.updatePastImgs())
 
 
 # **** Settings Page **** #
@@ -876,7 +899,7 @@ class Settings(Frame):
         label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
         # subreddit border
-        self.subredditForm = LabelFrame(self, text = "Subreddits to pull from "\
+        self.subredditF = LabelFrame(self, text = "Subreddits to pull from "\
                                                      "(whitespace separated)")
         # nsfw border
         self.midTop = Frame(self.top)
@@ -910,16 +933,25 @@ class Settings(Frame):
 
         # download location border
         self.dlFrame = LabelFrame(self, text = "Picture download location")
-                
+        
+        # Single link border
+        self.singleF = LabelFrame(self, text = "Direct download link  "\
+                                        "ex. https://i.imgur.com/rhd1TFF.jpg")
+        self.singleE = Entry(self.singleF, width = 45)
+        self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
+        self.singleB = Button(self.singleF, text = "Get Image")
+        self.singleB.pack(side = "right", padx = (0, 5), pady = 5)
+        self.singleB.bind("<Button-1>", lambda x: rp.Single_link(self.singleE.get()))
+
         # Buttons
         self.letsGo = Button(self, text = "Let's Go!")
 #self.help = Button(self, text = "Help", command = self.helpButt)
       
         # subreddit entry
-        self.subreddits = Entry(self.subredditForm, width = 57)
+        self.subreddits = Entry(self.subredditF, width = 57)
         self.subreddits.insert(0, rp.Config.subreddits())
-        self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = (10,10),
-                             sticky = "w", pady = (5,5))
+        self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = 10,
+                             sticky = "w", pady = 5)
         # "download to" entry
         self.dlTxt = Label(self.dlFrame, text = "Download pictures to:", 
                            pady = 15)
@@ -992,16 +1024,17 @@ class Settings(Frame):
         
         # packs/binds
         # button packs
-        self.letsGo.pack(side = "bottom", anchor = "e", padx = 50, pady = 40)
+        self.letsGo.pack(side = "bottom", anchor = "e", padx = 25, pady = (10, 15))
         self.letsGo.bind("<Button-1>", self.get_pics)
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
         self.top.pack(side = "top", anchor = "w", pady = (10, 10))
-        self.subredditForm.pack(side = "top", anchor = "w",\
+        self.subredditF.pack(side = "top", anchor = "w",\
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
                           padx = (15, 10))
+        self.singleF.pack(side = "top", anchor = 'w', padx = (15, 10))
         self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
                              padx = (15, 5))
         self.res.pack(side = "top")
