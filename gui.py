@@ -25,12 +25,14 @@ class Application(Tk):
         Tk.__init__(self, master)
         # set title of application on titlebar
         self.wm_title("Reddit Paper") 
-        
+        # set theme
+        theme = ttk.Style()
+        theme.theme_use('clam')
         # set up frame to hold widgets
-        root = Frame(self, background="bisque")
+        root = Frame(self)                              # background="bisque")
         root.pack(side = "top", fill = "both", expand = True)
         
-        Fonts.underline(self) 
+        #Fonts.underline(self) 
         # set minsize of application
         self.setUpWindow() 
 
@@ -43,7 +45,7 @@ class Application(Tk):
         StatusBar(master)
         
         # window used to pack the pages into
-        self.window = Frame(root, bg = "cyan")         
+        self.window = Frame(root)#bg = "cyan")         
         self.window.pack()
         self.frames = {}
         for F in (CurrentImg, PastImgs, Settings, About):
@@ -52,7 +54,7 @@ class Application(Tk):
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         # frame to show on startup
-        self.show_frame(PastImgs)#CurrentImg)
+        self.show_frame(CurrentImg)
     def show_frame(self, page):
         """
             Input: the page to display
@@ -62,17 +64,68 @@ class Application(Tk):
         # sets the focus on the itemFrame when the
         # PastImgs button is clicked so that the
         # list of pictures is scrollable
-        if page is PastImgs:
-            try:
+        self.setButtonImages(page)
+        frame.tkraise()
+   
+    def setButtonImages(self, page):
+        """
+            Sets the button images for the top of the program to change 
+            background color depending on which page is active
+        """
+        # images named by past image (p), currentimg (c),
+        # about (a), settings (s), and then whether it will
+        # be clicked (_c) or unclicked (_u)
+        self.c_c = PhotoImage(file = './images/c_c.png')
+        self.c_u = PhotoImage(file = './images/c_u.png')
+        
+        self.p_c = PhotoImage(file = './images/p_c.png')
+        self.p_u = PhotoImage(file = './images/p_u.png')
+        
+        self.s_c = PhotoImage(file = './images/s_c.png')
+        self.s_u = PhotoImage(file = './images/s_u.png')
+        
+        self.a_c = PhotoImage(file = './images/a_c.png')
+        self.a_u = PhotoImage(file = './images/a_u.png')
+
+        # if page is clicked, set that image to be '_c' (clicked)
+        # and set all other pages to be 'unclicked'
+        if page is CurrentImg:
+            # current image page
+            self.buttons.c.config(image = self.c_c)
+            self.buttons.p.config(image = self.p_u)
+            self.buttons.s.config(image = self.s_u)
+            self.buttons.a.config(image = self.a_u)
+
+        elif page is PastImgs:
+            # past images page
+            self.buttons.c.config(image = self.c_u)
+            self.buttons.p.config(image = self.p_c)
+            self.buttons.s.config(image = self.s_u)
+            self.buttons.a.config(image = self.a_u)
+            
+            try: 
                 frame.itemFrame.focus_set()
-            except:# (AttributeError):
+            
+            except: 
                 # all images are likely deleted from
                 # the itemFrame
                 pass
 
-        frame.tkraise()
-    
+        elif page is Settings:
+            # settinsg page 
+            self.buttons.c.config(image = self.c_u)
+            self.buttons.p.config(image = self.p_u)
+            self.buttons.s.config(image = self.s_c)
+            self.buttons.a.config(image = self.a_u)
+             
+        else:
+            # about page
+            self.buttons.c.config(image = self.c_u)
+            self.buttons.p.config(image = self.p_u)
+            self.buttons.s.config(image = self.s_u)
+            self.buttons.a.config(image = self.a_c)
 
+ 
     def addIcon(self):
         self.img = PhotoImage(file = 'images/reddit.png')
         self.tk.call('wm', 'iconphoto', self._w, self.img)
@@ -96,7 +149,7 @@ class Application(Tk):
                                            self.x, self.y))
 
 
-
+###############################################################################
 class AboutInfo():
     """
         Information about the GUI version, links to static sites (reddit,
@@ -182,7 +235,7 @@ class Message(Toplevel):
         """
             Place a button at the bottom of the widget with the text "Okay"
         """
-        b = Button(self, text = "Okay", command = self.delete)
+        b = ttk.Button(self, text = "Okay", command = self.delete)
         b.pack(side = "bottom", pady = pady)
 
 
@@ -276,7 +329,7 @@ class Fonts():
     _HYPERLINK = "#0000EE"
     _XL = 16 
     _L = 12
-    _MED = 10
+    _M = 10
     _SM = 7
     _H1 = 25
      
@@ -292,7 +345,7 @@ class Fonts():
         m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
         return m
     def MED_U():
-        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._MED,
+        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
                          underline = True)
         return med_u
 
@@ -310,7 +363,7 @@ class Fonts():
         xl = font.Font(family = Fonts._VERDANA, size = Fonts._XL)
         return xl
     def XL_U():
-        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._xl,
+        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._XL,
                          underline = True)
         return xl_u
 
@@ -319,22 +372,10 @@ class Fonts():
         h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
         return h1
     def H1_U():
-        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._h1,
+        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._H1,
                          underline = True)
         return h1_u
 
-
-    def underline(master):
-        """
-            Gives the ability to have entire strings of text
-            underlined. Used for links.
-        """
-        global UNDERLINE
-        # Defined in its own function as the
-        # Font() call must be made after a Tk()
-        # instance has been created.
-        UNDERLINE = font.Font(master, Fonts.L())
-        UNDERLINE.configure(underline = True)
 
 class ImageFormat():
 
@@ -370,7 +411,7 @@ class StatusBar(Frame):
         # statusbar for bottom of application
         self.text = StringVar()
         self.text.set(rp.Config.statusBar())
-        self.statusBar = Label(master, text = self.text.get(), bd=1,
+        self.statusBar = ttk.Label(master, text = self.text.get(), border=1,
                           relief = SUNKEN, anchor = "w")
          
         # pack the labels/frame to window
@@ -393,36 +434,36 @@ class StatusBar(Frame):
         self.after(1000, lambda: self.setText())
 
 
+###############################################################################
 class AddButtons(Frame):
 
     def __init__(self, master, cls):
-        global STATUSBAR
         Frame.__init__(self, master)
-        self.topbar = Frame(master, bg="red")
+        self.topbar = Frame(master)#bg="red")
 
         # current image button
-        self.cphoto = PhotoImage(file="./images/currentpic_square.png")
+        self.cphoto = PhotoImage(file="./images/c_c.png")
         self.c = Button(self.topbar, image = self.cphoto, 
                         width = 125, height = 125, cursor = Fonts._CURSOR,
                         command = lambda: cls.show_frame(CurrentImg))
         self.c.grid(row = 0, column = 0, sticky = "N")
 
         # past image button
-        self.pphoto = PhotoImage(file="./images/pastpic_square.png")
+        self.pphoto = PhotoImage(file="./images/p_u.png")
         self.p = Button(self.topbar, image = self.pphoto, 
                         width = 125, height = 125, cursor = Fonts._CURSOR,
                         command = lambda: cls.show_frame(PastImgs))
         self.p.grid(row = 0, column = 1, sticky = "N")
 
         # settings buttons
-        self.sphoto = PhotoImage(file="./images/settingpic_square.png")
+        self.sphoto = PhotoImage(file="./images/s_u.png")
         self.s = Button(self.topbar, image = self.sphoto, 
                         width = 125, height = 125, cursor = Fonts._CURSOR,
                         command = lambda: cls.show_frame(Settings))
         self.s.grid(row=0, column = 2, sticky = "N")
 
         # about buttons
-        self.aphoto = PhotoImage(file="./images/aboutpic_square.png")
+        self.aphoto = PhotoImage(file="./images/a_u.png")
         self.a = Button(self.topbar, image = self.aphoto, 
                         width = 125, height = 125, cursor = Fonts._CURSOR,
                         command = lambda: cls.show_frame(About))
@@ -454,8 +495,7 @@ class CurrentImg(Frame, ImageFormat):
         """
         Frame.__init__(self, parent)
         # pack frames/labels
-        self.frame = Frame(self, width = 525, height = 400,\
-                           bg = "magenta")
+        self.frame = Frame(self, width = 525, height = 400)     #bg = "magenta")
         self.frame.pack_propagate(0)
         self.frame.pack()
          
@@ -487,7 +527,7 @@ class CurrentImg(Frame, ImageFormat):
             # AttributeError is in case the image returned
             # is incomplete
             except (AttributeError, TypeError):
-                rp.log.debug("Attribute Error in get_past_img")
+                rp.log.debug("Attribute Error in get_past_img", exc_info = True)
 
         else:
             rp.log.debug("No image set as last image in settings.conf")
@@ -502,14 +542,13 @@ class CurrentImg(Frame, ImageFormat):
         # create subframe to pack widgets into, then destroy it
         # later
         self.image_name = im.image_name
-        self.subFrame = Frame(self.frame, width = 525, height = 410,\
-                              bg = "white")
+        self.subFrame = Frame(self.frame, width = 525, height = 410)#bg="white")
         self.subFrame.pack_propagate(0)
         self.subFrame.pack()
        
         # create title link
-        self.linkLabel = Label(self.subFrame, text = im.title,
-                               font = UNDERLINE, fg = Fonts._HYPERLINK,
+        self.linkLabel = ttk.Label(self.subFrame, text = im.title,
+                               font = Fonts.L_U(), foreground = Fonts._HYPERLINK,
                                cursor = Fonts._CURSOR, wraplength = 500)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
         self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
@@ -526,7 +565,7 @@ class CurrentImg(Frame, ImageFormat):
                 imThumb.save(im.thumb_save_loc, "PNG")
             # apply photolabel to page to display
             self.photo = PhotoImage(file = im.thumb_save_loc)
-            self.photoLabel = Label(self.subFrame, image = self.photo)
+            self.photoLabel = ttk.Label(self.subFrame, image = self.photo)
             self.photoLabel.pack(side = "bottom", expand = True)
         except FileNotFoundError:
             pass
@@ -584,13 +623,14 @@ class PastImgs(Frame, ImageFormat):
         self.selVar = BooleanVar()
         self.selVar.set(False)
         self.selVar.trace('w', lambda e, x, y: self.change_all(e)) 
-        selectBox = Checkbutton(self, text = "Select all",  variable = self.selVar)
+        selectBox = ttk.Checkbutton(self, text = "Select all",  variable = self.selVar)
         selectBox.pack(anchor = 'w', pady = (15, 2), padx = (21, 10))
 
         ### begin canvas/frame/picture list
-        self.picFrame = Frame(self, bg = "blue", width = 450, height = 300)
+        self.picFrame = Frame(self, width = 450, height = 300)#bg = "blue",
         self.picFrame.pack()
-        self.canvas = Canvas(self.picFrame, bg = '#575757', width = 450, height = 300)
+        self.canvas = Canvas(self.picFrame, relief = 'sunken', width = 450,
+                             height = 300) #bg='#575757',
         self.canFrame = Frame(self.canvas)
         self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
         self.canvas.pack(side="left")
@@ -606,8 +646,8 @@ class PastImgs(Frame, ImageFormat):
         self.populate(self.canFrame, self.picList) 
 
         # bottom frame for buttons
-        self.bottomFrame = Frame(self, bg = 'yellow')        
-        self.delete = Button(self.bottomFrame, text = "Delete selected", 
+        self.bottomFrame = Frame(self)                          #bg = 'yellow')
+        self.delete = ttk.Button(self.bottomFrame, text = "Delete selected", 
                                state = "normal",
                                command = lambda: ConfirmMsg(self))
         # 'delete all' button 'delete selected' button
@@ -621,7 +661,7 @@ class PastImgs(Frame, ImageFormat):
         self.updatePastImgs()
 
     def setScroll(self):
-        self.scroll = Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
+        self.scroll = ttk.Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
         self.canvas.configure(yscrollcommand = self.scroll.set)
         self.scroll.pack(side="right", fill="y")
         self.picFrame.bind("<Configure>", self.setFrame) 
@@ -757,7 +797,7 @@ class PastImgs(Frame, ImageFormat):
                 continue 
  
             # create frame to hold information for one picture
-            self.itemFrame = Frame(frame, width = 450, height = 50, bg = 'pink')
+            self.itemFrame = Frame(frame, width = 450, height = 50)#bg = 'pink')
             self.itemFrame.grid(row = i, column = 0)
             self.itemFrame.pack_propagate(0) 
             self.frames.append(self.itemFrame)
@@ -766,7 +806,7 @@ class PastImgs(Frame, ImageFormat):
             self.checkVar = BooleanVar()
             self.checkBoxes.append(self.checkVar)
             self.checkVar.set(False)
-            self.check = Checkbutton(self.itemFrame,
+            self.check = ttk.Checkbutton(self.itemFrame,
                                      variable = self.checkBoxes[i])
             self.check.pack(side = "left", padx = 5)
            
@@ -775,7 +815,7 @@ class PastImgs(Frame, ImageFormat):
                                im.image_name, im.thumb_name))
             # insert the thumbnail
             self.photo = PhotoImage(file = im.thumb_save_loc)
-            self.photoLabel = Label(self.itemFrame, image = self.photo)
+            self.photoLabel = ttk.Label(self.itemFrame, image = self.photo)
             self.photoLabel.image = self.photo # keep a reference per the docs!
             self.photoLabel.pack(side = "left", padx = 10)
             
@@ -783,26 +823,32 @@ class PastImgs(Frame, ImageFormat):
             self.txtFrame = Frame(self.itemFrame)
             self.txtFrame.pack()
             # title label 
-            self.title = Label(self.txtFrame, text = im.title,
-                               font = Fonts.SM(), wraplength = 325)
+            # adjust font size if title is too long 
+            if len(im.title) > 100:
+                font_to_use = Fonts.SM()
+            else:
+                font_to_use = Fonts.MED()
+
+            self.title = ttk.Label(self.txtFrame, text = im.title,
+                               font = font_to_use, wraplength = 325)
             self.title.pack(side = "top", padx = 10)
             
             self.botTxtFrame = Frame(self.txtFrame)
             self.botTxtFrame.pack(side = "bottom")
             
             # link to post
-            self.link = Label(self.botTxtFrame, text = "Link",
+            self.link = ttk.Label(self.botTxtFrame, text = "Link",
                               font = Fonts.MED_U(),
-                              cursor = Fonts._CURSOR, fg = Fonts._HYPERLINK)
+                              cursor = Fonts._CURSOR, foreground = Fonts._HYPERLINK)
             self.link.pack(side = "left", anchor = 'w')
 # how to remember variable in a for loop: 
 # https://stackoverflow.com/questions/14259072/tkinter-bind-function-with-variable-in-a-loop/14260871#14260871
             self.link.bind("<Button-1>", self.make_link(im))
             
             # set as wallpaper
-            self.setAs = Label(self.botTxtFrame, text = "Set as Wallpaper",
+            self.setAs = ttk.Label(self.botTxtFrame, text = "Set as Wallpaper",
                                font = Fonts.MED_U(), cursor = Fonts._CURSOR,
-                               fg = Fonts._HYPERLINK)
+                               foreground = Fonts._HYPERLINK)
             self.setAs.pack(side = "left", anchor = 'w')
             self.setAs.bind("<Button-1>", self.make_wallpaper(im))
             
@@ -895,69 +941,67 @@ class Settings(Frame):
         # Frames
         temp = rp.Config.read_config()
         Frame.__init__(self, parent)
-        label = Label(self, text="Settings", font = Fonts.H1, bg="yellow")
-        label.pack(pady = 10, padx = 10)
         self.top = Frame(self)
         # subreddit border
-        self.subredditF = LabelFrame(self, text = "Subreddits to pull from "\
+        self.subredditF = ttk.LabelFrame(self, text = "Subreddits to pull from "\
                                                      "(whitespace separated)")
         # nsfw border
         self.midTop = Frame(self.top)
-        self.checksFrame = LabelFrame(self.midTop, text = "Adult Content")
+        self.checksFrame = ttk.LabelFrame(self.midTop, text = "Adult Content")
         self.checks = Frame(self.checksFrame)
         
         # width x height
-        self.dimensions = LabelFrame(self.top, 
+        self.dimensions = ttk.LabelFrame(self.top, 
                                      text = "Picture Resolution")
         self.res = Frame(self.dimensions)
 
         # maxposts
-        self.maxLabel = LabelFrame(self.midTop, text = "# of Posts")
+        self.maxLabel = ttk.LabelFrame(self.midTop, text = "# of Posts")
         self.maxFrame = Frame(self.maxLabel)
-        self.maxTxt = Label(self.maxFrame, text = "Maxposts:")
+        self.maxTxt = ttk.Label(self.maxFrame, text = "Maxposts:")
         self.maxTxt.pack(side = "left", padx = (5, 0))
-        self.maxE = Entry(self.maxFrame, width = 3)
+        self.maxE = ttk.Entry(self.maxFrame, width = 3)
         self.maxE.insert(0, rp.Config.maxposts())
         self.maxE.pack(side = "left", padx = (5,5), pady = (0, 5))
         self.maxFrame.pack()
 
         # cycletime border and frame
         self.topRt = Frame(self.top)
-        self.ct = LabelFrame(self.topRt, text = "Wallpaper Timer")
+        self.ct = ttk.LabelFrame(self.topRt, text = "Wallpaper Timer")
         self.ctFrame = Frame(self.ct)
         
         # category border and frame
-        self.cat = LabelFrame(self.topRt, text = "Section")
+        self.cat = ttk.LabelFrame(self.topRt, text = "Section")
         self.catFrame = Frame(self.cat, width = 200, height = 30)
         self.catFrame.pack_propagate(0)
 
         # download location border
-        self.dlFrame = LabelFrame(self, text = "Picture download location")
+        self.dlFrame = ttk.LabelFrame(self, text = "Picture download location")
         
         # Single link border
-        self.singleF = LabelFrame(self, text = "Direct download link  "\
+        self.singleF = ttk.LabelFrame(self, text = "Direct download link  "\
                                         "ex. https://i.imgur.com/rhd1TFF.jpg")
-        self.singleE = Entry(self.singleF, width = 45)
+        self.singleE = ttk.Entry(self.singleF, width = 45)
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
-        self.singleB = Button(self.singleF, text = "Get Image")
+        self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = (0, 5), pady = 5)
         self.singleB.bind("<Button-1>", lambda x: rp.Single_link(self.singleE.get()))
 
         # Buttons
-        self.letsGo = Button(self, text = "Let's Go!")
-#self.help = Button(self, text = "Help", command = self.helpButt)
+        self.letsGo = ttk.Button(self, text = "Let's Go!")
+#self.help = ttk.Button(self, text = "Help", command = self.helpButt)
       
         # subreddit entry
-        self.subreddits = Entry(self.subredditF, width = 57)
+        self.subreddits = ttk.Entry(self.subredditF, width = 57)
         self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = 10,
                              sticky = "w", pady = 5)
         # "download to" entry
-        self.dlTxt = Label(self.dlFrame, text = "Download pictures to:", 
-                           pady = 15)
+        self.dlTxt = ttk.Label(self.dlFrame, text = "Download pictures to:") 
+                           #pady = 15)
         self.dlTxt.grid(row = 0, column = 0, ipadx = 5, sticky = "w")
-        self.dlLoc = Entry(self.dlFrame, width = 40)
-        self.dlLoc.insert(0, rp.Config.dlLoc())
+        self.dlLoc = ttk.Entry(self.dlFrame, width = 40)
+        self.dlLoc.insert(0, rp.Config.downloadLoc())
         self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = (0, 10))
 
         # Frames for width x height
@@ -967,47 +1011,47 @@ class Settings(Frame):
         self.heightF.pack(side = "top")
 
         # Min width
-        minWidthTxt = Label(self.widthF, text = " Min-width:")
+        minWidthTxt = ttk.Label(self.widthF, text = " Min-width:")
         minWidthTxt.grid(row = 0, column = 0, sticky = "e", pady = (10, 0))
         # min width entry
-        self.minwidth = Entry(self.widthF, width = 6)
+        self.minwidth = ttk.Entry(self.widthF, width = 6)
         self.minwidth.insert(0, rp.Config.minwidth())
         self.minwidth.grid(row = 0, column = 1, padx = (5, 5))
         # Min height
-        minHeightTxt = Label(self.heightF, text = "  Min-height:")
+        minHeightTxt = ttk.Label(self.heightF, text = "  Min-height:")
         minHeightTxt.grid(row = 1, column = 0, sticky = "e", pady = (0, 6))
         # min height entry
-        self.minheight = Entry(self.heightF, width = 6)
+        self.minheight = ttk.Entry(self.heightF, width = 6)
         self.minheight.insert(0, rp.Config.minheight())
         self.minheight.grid(row = 1, column = 1, padx = (0, 10), pady = (0, 10))
        
         # nsfw checkbutton
         # nsfw on text
-        nsfwTxt = Label(self.checks, text = "NSFW:")
+        nsfwTxt = ttk.Label(self.checks, text = "NSFW:")
         nsfwTxt.pack(side = "left", ipadx = 5)
         # nsfw var config
         self.onOff = BooleanVar()
         self.onOff.set(rp.Config.nsfw())
         # nsfw checkbutton config
-        self.nsfw = Checkbutton(self.checks, text = "On",
+        self.nsfw = ttk.Checkbutton(self.checks, text = "On",
                                 variable = self.onOff)
        
         # cycletime txt
-        self.ctTxt = Label(self.ctFrame, text = "Set for:")
+        self.ctTxt = ttk.Label(self.ctFrame, text = "Set for:")
         self.ctTxt.grid(row = 0, column = 0, sticky = "e", padx = (5,0))
         # cycletime entry
         self.rpHr, self.rpMin = rp.Config.cycletime()
         # hour txt/entry
-        self.ctHourE = Entry(self.ctFrame, width = 4)
+        self.ctHourE = ttk.Entry(self.ctFrame, width = 4)
         self.ctHourE.insert(0, self.rpHr)
         self.ctHourE.grid(row = 0, column = 1, padx = (5,0))
-        self.ctHourTxt = Label(self.ctFrame, text = "hrs")
+        self.ctHourTxt = ttk.Label(self.ctFrame, text = "hrs")
         self.ctHourTxt.grid(row = 0, column = 2, padx = (0, 5))
         # min txt/entry
-        self.ctMinE = Entry(self.ctFrame, width = 4)
+        self.ctMinE = ttk.Entry(self.ctFrame, width = 4)
         self.ctMinE.insert(0, self.rpMin)
         self.ctMinE.grid(row = 0, column = 3)
-        self.ctMinTxt = Label(self.ctFrame, text = "mins", anchor = "w")
+        self.ctMinTxt = ttk.Label(self.ctFrame, text = "mins", anchor = "w")
         self.ctMinTxt.grid(row = 0, column = 4, padx = (0, 5))
         self.ctFrame.pack(side = "top", ipady = 2)
        
@@ -1015,10 +1059,10 @@ class Settings(Frame):
         self.choices = ["Hot", "New", "Rising", "Top", "Controversial"]
         self.catVar = StringVar(self)
         self.catVar.set(rp.Config.category())
-        self.catDD = OptionMenu(self.catFrame, self.catVar, *self.choices)
+        self.catDD = ttk.OptionMenu(self.catFrame, self.catVar, *self.choices)
         self.catDD.config(width = 10)
         self.catDD.pack(side = "right", anchor = "e", padx = (0, 5)) 
-        self.catTxt = Label(self.catFrame, text = "Category:")
+        self.catTxt = ttk.Label(self.catFrame, text = "Category:")
         self.catTxt.pack(side = "right", padx = (5, 0), anchor = "e")
         self.catFrame.pack(side = "top", ipady = 2)
         
@@ -1048,9 +1092,7 @@ class Settings(Frame):
         self.cat.pack(side = "bottom")
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-    def maxPosts(self):
-        pass
-        
+    
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -1062,11 +1104,11 @@ class Settings(Frame):
         self.values['-c'] =  self.catVar.get().lower()
         self.values['-mp'] = self.maxE.get()
 
-        # convert hours to minutes, then add it to minutes, so we 
-        # are only dealing with total minutes in the end
         errors = self.test_values(self.values)
         
         try:
+            # convert hours to minutes, then add it to minutes, so we 
+            # are only dealing with total minutes in the end
             totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
             self.values['-t'] = totalTime
             CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +
@@ -1151,46 +1193,47 @@ class About(Frame):
         Frame.__init__(self, parent)
        
         # frames
-        label = Label(self, text="About", font = Fonts.H1, bg="green")
-        label.pack(pady = 10, padx = 10)
-        self.authorFrame = LabelFrame(self, text = "Author")
-        self.donateFrame = LabelFrame(self, text = "Donations")
-        self.crashFrame = LabelFrame(self, text = "Crash Report")
+        self.authorFrame = ttk.LabelFrame(self, text = "Author")
+        self.donateFrame = ttk.LabelFrame(self, text = "Donations")
+        self.crashFrame = ttk.LabelFrame(self, text = "Crash Report")
         self.versionFrame = Frame(self.authorFrame)
         self.subAuthorFrame = Frame(self.authorFrame)
-        self.feedFrame = LabelFrame(self, text = "Feeback")
+        self.feedFrame = ttk.LabelFrame(self, text = "Feeback")
 
         # author
-        self.authorTxt = Label(self.subAuthorFrame,
+        self.authorTxt = ttk.Label(self.subAuthorFrame,
                                text = "This program was created by: ",\
                                font = Fonts.L())
-        self.authorLink = Label(self.subAuthorFrame, text="/u/camerongagnon", 
-                                font = UNDERLINE, fg = Fonts._HYPERLINK,
-                                cursor = Fonts._CURSOR)
+        self.authorLink = ttk.Label(self.subAuthorFrame, 
+                                    text="/u/camerongagnon", 
+                                    font = Fonts.L_U(), 
+                                    foreground = Fonts._HYPERLINK,
+                                    cursor = Fonts._CURSOR)
 
         # version number
         self.vNum = StringVar()
         self.vNum.set("Version: " + rp.AboutInfo.version() + "." +
                       AboutInfo.version())
-        self.version = Label(self.versionFrame, text = self.vNum.get(),
+        self.version = ttk.Label(self.versionFrame, text = self.vNum.get(),
                              font = Fonts.L())
         
         # donate text/link
-        self.donateTxt = Label(self.donateFrame,
+        self.donateTxt = ttk.Label(self.donateFrame,
                                text = "If you enjoy this program, "
                                       "please consider making a donation ",
                                font = Fonts.L())
         self.subDonateFrame = Frame(self.donateFrame)
-        self.donateTxt2 = Label(self.subDonateFrame,
+        self.donateTxt2 = ttk.Label(self.subDonateFrame,
                                 text = "to the developer at the following "
                                        "link,",
                                 font = Fonts.L()) 
-        self.donateLink = Label(self.subDonateFrame, text = "here.",
-                                font = UNDERLINE, fg = Fonts._HYPERLINK,
-                                cursor = Fonts._CURSOR) 
+        self.donateLink = ttk.Label(self.subDonateFrame, text = "here.",
+                                    font = Fonts.L_U(),
+                                    foreground = Fonts._HYPERLINK,
+                                    cursor = Fonts._CURSOR) 
 
         # feedback
-        self.feedback = Label(self.feedFrame,
+        self.feedback = ttk.Label(self.feedFrame,
                               text = "To provide comments/feedback, please "
                                      "do one of the following: \n"
                                      "1. Go to /r/reddit_paper and create a "
@@ -1203,12 +1246,12 @@ class About(Frame):
         self.location = self.get_crash_location()
         self.crash_loc.set(self.location)
 
-        self.report = Label(self.crashFrame,
+        self.report = ttk.Label(self.crashFrame,
                             text = "To send a crash report, please\n"
                             "browse to the location below and send the log\n"
                             "to cameron.gagnon@gmail.com.", 
                             font = Fonts.L())
-        self.crash_loc = Label(self.crashFrame, text = self.crash_loc.get(),
+        self.crash_loc = ttk.Label(self.crashFrame, text = self.crash_loc.get(),
                                wraplength = 480)
 
         # packs/binds
@@ -1221,7 +1264,8 @@ class About(Frame):
         # version frame pack within author frame
         self.version.pack()
         self.versionFrame.pack(side = "top")
-        self.authorFrame.pack(side = "top", fill = "x", padx = (10, 15))
+        self.authorFrame.pack(side = "top", fill = "x", pady = (10, 0),
+                              padx = (10, 15))
         # donate frame pack
         self.donateTxt.pack(side = "top", padx = (30, 0))
         self.donateTxt2.pack(side = "left", padx = (30, 0))
