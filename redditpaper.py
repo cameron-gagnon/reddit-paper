@@ -39,6 +39,7 @@ import subprocess
 import logging
 import logging.handlers
 import getpass
+from detools import wallpaper
 from PIL import Image
 from bs4 import BeautifulSoup
 from socket import timeout
@@ -74,7 +75,6 @@ def main():
         Config_logging()
         args = Parse_cmd_args()
         config = Config.config(args)
-#env = de.get_desktop_environment()
         
         # checks if a single link was entered by the user to download
         Single_link(SINGLELINK)
@@ -110,13 +110,15 @@ class BaseImg():
             should be set.
         """
         try:                            
-            subprocess.call(args = SETWALLPAPER + self.image_name, 
-                            shell = True)
-            statusStr = "Wallpaper should be set to: %s " % (self.image_name)
+            # call wallpaper program to set the image as the
+            # wallpaper
+            print(Config.downloadLoc() + self.image_name) 
+            wallpaper.set_wallpaper(Config.downloadLoc() + self.image_name)
             
+            statusStr = "Wallpaper should be set to: %s " % (self.image_name)
             Config.writeStatusBar(statusStr) 
             log.debug(statusStr)
-            
+             
             # sets the last wallpaper to the config file
             config = Config.file_found()
             if config:
@@ -124,11 +126,6 @@ class BaseImg():
                 with open('settings.conf', 'w') as configfile:
                     config.write(configfile)
    
-
-#gui.STATUSBAR.setText(statusStr)
-#TOFIX ACCESS STATUSBAR FROM REDDITPAPER.PYstatusBar = gui.Statusbar()    
-#TO FIX gui.AddButtons.setStatusText(statusStr)
-
         except KeyboardInterrupt:
                 sys.exit(0)
         except:
@@ -194,16 +191,26 @@ class SingleImg(Img):
         if link:
             self.setLink(link)
             flag = self.download(link)
-            
             if flag:
                 self.setAsWallpaper()
+                
+                sql, cur = Database.connect_to_DB()
+                cur.execute('INSERT INTO oldposts (ImgName, ImgTitle,\
+                             ImgLink, ImgPost) VALUES (?, ?, ?, ?)',
+                            [self.image_name, self.title, self.link, self.link])
+                sql.commit()
+
 
     def download(self, link):
         """ Downloads the image to the save location  """
-        self.formatImgName()
-        self.setSaveLoc()
+        try:
+            self.formatImgName()
+            self.setSaveLoc()
+            self.title = "User downloaded: " + self.image_name
+        except:
+            return False
 
-        # gets the pic download information and sets the download location
+        # gets the pic download information
         picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
     
         try:
@@ -212,7 +219,7 @@ class SingleImg(Img):
         except urllib.error.HTTPError:
             log.exception("Could not open the specified picture webpage!!\n",
                           exc_info = True)
-            Config.writeStatusBar("Error downloading %s" % SINGLELINK)
+            Config.writeStatusBar("Error downloading %s" % link)
             sys.exit(0)
     
         log.info("Downloading: %s \n\t\t\t\t\t\t  as: %s "\
@@ -387,7 +394,7 @@ class Config():
             determined by the dict that is passed in
         """
         # split up the jumble of time to set the hr and min correctly
-        args['CYCLEHR'], args['CYCLEMIN'] = Config.format_time(args['CYCLETIME'])
+        args['CYCLEHR'], args['CYCLEMIN']=Config.format_time(args['CYCLETIME'])
         # convert NSFW from on/off to True/False 
         args['NSFW'] = Config.convert_NSFW(args['NSFW'])
 
@@ -480,19 +487,23 @@ class Config():
                                 fallback = "futureporn+wallpapers+lavaporn+"
                                   "earthporn+imaginarystarscapes+spaceporn")
         args['MINWIDTH'] = config.getint('Options', 'Minwidth', fallback = 1024)
-        args['MINHEIGHT'] = config.getint('Options', 'Minheight', fallback = 768)
+        args['MINHEIGHT'] = config.getint('Options', 'Minheight',
+                                          fallback = 768)
         args['MAXPOSTS'] = config.getint('Options', 'Max posts',
-                                 fallback = 5)
-        args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes', fallback = 0.05)
+                                         fallback = 5)
+        args['CYCLETIME'] = config.getfloat('Cycletime', 'Minutes',
+                                            fallback = 0.05)
         # must convert minutes and hours to only minutes as that's how the 
         # cycle time works
         hours = config.getfloat('Cycletime', 'Hours', fallback = 0)
         args['CYCLETIME'] = hours * 60 + args['CYCLETIME']
         args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
-        args['NSFW'] = config.getboolean('Adult Content', 'NSFW', fallback = False)
+        args['NSFW'] = config.getboolean('Adult Content', 'NSFW',
+                                         fallback = False)
         args['DOWNLOADLOCATION'] = config.get('Save Location', 'Directory',
-                                      fallback = os.getcwd())
-        URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + args['CATEGORY'] + "/"
+                                              fallback = os.getcwd())
+        URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + \
+                                            args['CATEGORY'] + "/"
         return args
 
     def minwidth():
@@ -527,11 +538,11 @@ class Config():
             return hr, min_
         return "", ""
 
-    def dlLoc():
+    def downloadLoc():
         config = Config.file_found()
         if config:
-            dlLoc = config.get('Save Location', 'Directory')
-            return dlLoc
+            downloadLoc = config.get('Save Location', 'Directory')
+            return downloadLoc
         return ""
   
     def nsfw():
@@ -605,8 +616,9 @@ def Config_logging():
     
     # add filehandler so once the filesize reaches 5MB a new file is 
     # created, up to 3 files
-    fileHandle = logging.handlers.RotatingFileHandler(
-                                "CrashReport.log", maxBytes=5000000, backupCount=3)
+    fileHandle = logging.handlers.RotatingFileHandler("CrashReport.log",
+                                                      maxBytes=5000000,
+                                                      backupCount=3)
     fileHandle.setFormatter(formatFile)
     rootLog.addHandler(fileHandle)
     
@@ -691,7 +703,7 @@ def General_parser(img_link):
 #         to Flickr. This SO post helped:
 # https://stackoverflow.com/questions/21673323/download-flickr-images-of-specific-url
 #
-# This is a list of titles and how to determine size based on ending characters -
+# A list of titles and how to determine size based on ending characters -
 # _o (original file) is used here as it is most reliable,
 # although sometimes a very large
 # https://www.flickr.com/services/api/misc.urls.html
@@ -869,7 +881,7 @@ def Imgur_parse(url, regex):
     # /a/ means an album in imgur standards
     elif (url.find('/a/') != -1):
         # have to find new url to download the first image from album
-        uaurl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
+        uaurl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
         imgur_html = urllib.request.urlopen(uaurl)
         soup = BeautifulSoup(imgur_html)
         
@@ -994,15 +1006,10 @@ def Already_downloaded(im):
     log.debug("Result of Already_downloaded is: %s", result)
     
     if result: 
-#and not Check_width_height(im.id):
-        return True
-    
-#elif result: # need to add check here that file is actually downloaded
-                 # instead of basing it on past min-width/min-height requirements
-                 # as those might have changed when running program again
         log.info("Picture: %s is already downloaded, will not "
                  "download again.", im.image_name)
-#return True
+        return True
+    
     else:
         return False            
 
@@ -1164,7 +1171,7 @@ def Main_photo_controller(r):
 
     i = 1        
  
-    for i, post in enumerate(r.get_content(url=URL, limit = MAXPOSTS), start = 1):
+    for i, post in enumerate(r.get_content(url=URL,limit = MAXPOSTS),start = 1):
         
         # creates image class which holds necessary data about post
         im = Img(post)
