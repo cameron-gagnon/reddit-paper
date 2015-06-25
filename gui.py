@@ -65,6 +65,16 @@ class Application(Tk):
         # sets the focus on the itemFrame when the
         # PastImgs button is clicked so that the
         # list of pictures is scrollable
+        if page is PastImgs:
+            try: 
+                    frame.itemFrame.focus_set()
+            except:
+                rp.log.debug("Could not set focus to PastImgs, likely due to "
+                             "itemFrame not being available") 
+                # all images are likely deleted from
+                # the itemFrame
+                pass
+        
         self.setButtonImages(page)
         frame.tkraise()
    
@@ -102,13 +112,6 @@ class Application(Tk):
             self.buttons.p.config(image = self.p_c)
             self.buttons.s.config(image = self.s_u)
             self.buttons.a.config(image = self.a_u)
-            
-            try: 
-                frame.itemFrame.focus_set()
-            except: 
-                # all images are likely deleted from
-                # the itemFrame
-                pass
 
         elif page is Settings:
             # settinsg page 
@@ -668,8 +671,7 @@ class PastImgs(Frame, ImageFormat):
             Sets the binds to the keys for the canvas movements
             when adding new elts
         """
-        widget.bind("<Button-4>", self.onMouseWheel)
-        widget.bind("<Button-5>", self.onMouseWheel)
+        widget.bind("<MouseWheel>", self.onMouseWheel)
         widget.bind("<Up>", self.onMouseWheel)
         widget.bind("<Down>", self.onMouseWheel)
      
@@ -678,17 +680,15 @@ class PastImgs(Frame, ImageFormat):
             Scrolls the canvas up or down depending on the 
             event entered (arrow keys/mouse scroll)
         """
-        keyNum = {116 : 1,   # Down arrow key
-                  111 : -1}  # Up arrow key
+        keyNum = {40 : 1,   # Down arrow key
+                  38 : -1}  # Up arrow key
         scrollVal = None
+        print(vars(event))
+
         if event.keycode in keyNum:
             scrollVal = keyNum.get(event.keycode)
-        elif event.num == 4:
-            scrollVal = -1
-        elif event.num == 5:
-            scrollVal = 1
         else:
-            scrollVal = event.delta # leave as is on OSX
+            scrollVal = int(-1*(event.delta/120))
 
         self.canvas.yview_scroll(scrollVal, "units")
 
@@ -1160,7 +1160,7 @@ class Settings(Frame):
         rp.log.debug("No errors in CLArgs") 
         # check if any values are null/empty
         # if so, don't add them to the list 
-        self.argList = os.getcwd() + "/redditpaper.py"
+        self.argList = os.getcwd() + '\\redditpaper.py'
         for k, v in self.args.items():
             rp.log.debug("Key, Value in CLArgs is: "
                          + k + " " + str(v))
@@ -1169,7 +1169,7 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-
+        self.argList = 'python.exe ' + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         
