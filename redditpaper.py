@@ -48,11 +48,7 @@ from requests.exceptions import ConnectionError
 from collections import OrderedDict
 #sets up global vars
 USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
-SETWALLPAPER = "gsettings set org.gnome.desktop.background picture-uri "\
-               "file:///media/cameron/Fresh500/pictures/wallofpapers"\
-                                                                "/reddit/"
-DOWNLOADLOCATION = "/media/cameron/Fresh500/pictures/wallofpapers"\
-                                                                "/reddit/"
+
 
 # MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
 # FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
@@ -113,7 +109,7 @@ class BaseImg():
             # call wallpaper program to set the image as the
             # wallpaper
             print(Config.downloadLoc() + self.image_name) 
-            wallpaper.set_wallpaper(Config.downloadLoc() + self.image_name)
+            wallpaper.set_wallpaper(self.save_location)
             
             statusStr = "Wallpaper should be set to: %s " % (self.image_name)
             Config.writeStatusBar(statusStr) 
@@ -173,7 +169,7 @@ class Img(BaseImg):
         self.nsfw = nsfw
     
     def setSaveLoc(self):
-        self.save_location = DOWNLOADLOCATION + str(self.image_name)
+        self.save_location = Config.downloadLoc() + str(self.image_name)
 
     def formatImgName(self):
         # finds last '/' in url
@@ -262,7 +258,7 @@ class DBImg(BaseImg):
             self.width = result[3]
             self.height = result[4]
             self.image_name = image_name
-            self.save_location = DOWNLOADLOCATION + self.image_name
+            self.save_location = Config.downloadLoc() + self.image_name
         except (sqlite3.OperationalError, TypeError):
             log.debug("Error occured in making a DBImg()") 
 
@@ -270,7 +266,7 @@ class DBImg(BaseImg):
         self.resolution = self.width + 'x' + self.height
 
     def updateSaveLoc(self, image_name):
-        self.thumb_save_loc = DOWNLOADLOCATION + image_name
+        self.thumb_save_loc = Config.downloadLoc() + image_name
 
 ########################################################################
 class PictureList():
@@ -374,7 +370,7 @@ class Config():
     """
         Values used to initiate the settings file.
     """
-    default_values = {'DOWNLOADLOCATION': os.getcwd(),
+    default_values = {'DOWNLOADLOCATION': "F:\\pictures\\wallofpapers\\reddit\\", #os.getcwd() + "\\",
                       'MINWIDTH': 1024,
                       'MINHEIGHT': 768,
                       'SUBREDDITS': "futureporn+earthporn+"
@@ -1080,7 +1076,7 @@ def Check_width_height(id):
 #         dimensions
 def PIL_width_height(im):
     # get size of image by checking it after it has already downloaded
-    with open(DOWNLOADLOCATION + im.image_name, 'rb') as file:
+    with open(Config.downloadLoc() + im.image_name, 'rb') as file:
         try:
             image = Image.open(file)
         except OSError:
@@ -1158,7 +1154,7 @@ def Download_img(url, im):
 #REQUIRES url 
 #MODIFIES download location, adds new picture to file
 #EFFECTS  Downloads a new picture from the url specified and saves
-#         it to the location specified from DOWNLOADLOCATION.
+#         it to the location specified from Config.downloadLoc().
 def Main_photo_controller(r):
     global image_list
     global MAXPOSTS
@@ -1178,7 +1174,7 @@ def Main_photo_controller(r):
         image_name, url, is_deviant = Title_from_url(im)
 
         Config.writeStatusBar("Checking %d of %d images" % (i, MAXPOSTS)) 
-        log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
+        log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
                   "\n\t\t\t\t\t\t  Link to Img: %s",
                   im.title, im.id, im.link)
@@ -1207,10 +1203,10 @@ def Main_photo_controller(r):
                 # the width/height is present and in range, and the 
                 # download is good, we can set the image as the background
                 if  Valid_width_height(im) and Download_img(url, im):
-                    
                     image_list.append(im)
                     log.debug("Image successfully downloaded with "
                               "WxH in title")
+
                 # if it's not a good width because it's too small or we
                 # couldn't find the title, then we check if we can download the
                 # image and if that succeeds, then we check the width/height
@@ -1225,8 +1221,12 @@ def Main_photo_controller(r):
                     log.debug("Image successfully downloaded WITHOUT "
                               "WxH in title")
                 else:
+                    log.debug("PIL_width_height didn't check out, and neither "
+                              "did Download_img, MAXPOSTS -= 1")
                     MAXPOSTS -= 1
             elif not Check_width_height(im.id):
+                log.debug("Already downloaded and Check_width_height didn't work "
+                          "MAXPOSTS -= 1")
                 MAXPOSTS -= 1 
             else:
                 # The reason for this is if a search is
@@ -1239,7 +1239,7 @@ def Main_photo_controller(r):
                 
                 image_list.append(im)
         i += 1
-    log.debug("Exiting Main_photo_controller fn")
+    log.debug("Exiting Main_photo_controller fn with MAXPOSTS %s" % MAXPOSTS)
 
 
 ###################################################################
@@ -1266,7 +1266,7 @@ def Cycle_wallpaper():
                 log.debug("NOT SETTING WALLPAPER. LIKELY AN HTML "
                           "FILE DUE TO NON DIRECT DOWNLOAD LINK "
                           "FOR THE IMAGE!!! SAVING YOU FROM A "
-                          "BLACK SCREEN! HALLELUJAH!")
+                          "BLACK SCREEN! HALLELUJAH!", exc_info = True)
                 continue
             im.setAsWallpaper()
             time.sleep(CYCLETIME*60)
@@ -1291,6 +1291,7 @@ def Parse_cmd_args():
     global SINGLELINK
     global SUBREDDITS
     global NSFW
+    global DOWNLOADLOCATION
 
     default = Config.read_config()
     log.debug("Default nsfw is: %s" % default['NSFW'])
