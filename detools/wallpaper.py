@@ -38,23 +38,21 @@ try:
     wallpaper_setters['unity'] = GnomeWallpaperSetter
     wallpaper_setters['cinnamon'] = GnomeWallpaperSetter
     
-except ImportError:
+except ImportError as e:
+    #print("ERROR IMPORTING FOR LINUX/GNOME", e)
     pass
 
 try:
     import ctypes
-    import win32con
     import shutil
-
     class WindowsWallpaperSetter(WallpaperSetter):
         def set_wallpaper(self, filename):
-            shutil.copy(filename, filename)
-            ctypes.windll.user32.SystemParametersInfoA(win32con.SPI_SETDESKWALLPAPER, 0, filename, 3)
-    
+            ctypes.windll.user32.SystemParametersInfoW(0x14, 0, filename, 3)
     
     wallpaper_setters['windows'] = WindowsWallpaperSetter
 
-except ImportError:
+except ImportError as e:
+    #print("ERROR IMPORTING FOR WINDOWS", e) 
     pass
 
 
@@ -164,9 +162,11 @@ def set_wallpaper(filename):
             wallpaper_setter.set_wallpaper(filename)
             print("Wallpaper set to: %s" % filename)
         except:
-            return WallpaperSetterError(wallpaper_setter.environment)
+            raise
+            #print("ERROROROROROROROROR")
+            #return WallpaperSetterError(wallpaper_setter.environment)
     else:
-            return WallpaperSetterError(wallpaper_setter.environment)
+        return WallpaperSetterError(wallpaper_setter.environment)
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
@@ -174,4 +174,5 @@ if __name__ == '__main__':
     elif len(sys.argv) == 1:
         print("No file given by user")
     else:
+        print("Wrong number of args")
         pass 
