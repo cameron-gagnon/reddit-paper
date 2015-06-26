@@ -282,8 +282,8 @@ class PictureList():
         try:
             cur.execute('SELECT * FROM oldposts')
         except sqlite3.OperationalError:
-            log.debug("First time running program, "
-                      "no table 'oldposts' in DB file")
+#log.debug("First time running program, "
+#          "no table 'oldposts' in DB file")
             # return empty list so when iterating the fn 
             # has no objects to iterate over
             return image_list 
@@ -562,7 +562,7 @@ class Config():
             category = config.get('Options', 'Category')
             firstLetter = category[0].upper()
             category = firstLetter + category[1:]
-            return category 
+            return category
         return "Hot"
 
     def maxposts():
@@ -1159,7 +1159,7 @@ def Main_photo_controller(r):
     global image_list
     global MAXPOSTS
     
-    Config.writeStatusBar("Fetching %s posts from specified"
+    Config.writeStatusBar("Fetching %s posts from specified "
                           "subreddits" % MAXPOSTS)
     log.debug("Fetching subreddits from %s", SUBREDDITS)
     log.debug("Pulling top %s posts", MAXPOSTS)
