@@ -23,16 +23,18 @@ class Application(Tk):
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
+        
         # set title of application on titlebar
-        self.wm_title("Reddit Paper") 
+        self.wm_title("Reddit Paper")
+        
         # set theme
         theme = ttk.Style()
-        theme.theme_use('clam')
+        theme.theme_use('vista')
+
         # set up frame to hold widgets
         root = Frame(self)                              # background="bisque")
         root.pack(side = "top", fill = "both", expand = True)
         
-        #Fonts.underline(self) 
         # set minsize of application
         self.setUpWindow() 
 
@@ -247,6 +249,8 @@ class ErrorMsg(Message):
         popup = Message.__init__(self, master, title) 
         length = 0
         height = 0
+        self.addIcon()
+
         if isinstance(text, list):
             if len(text) == 1:
                 # if string, return length of string
@@ -260,7 +264,7 @@ class ErrorMsg(Message):
                 # length of the list is num of elts in list 
                 # so to get the height, we take this and
                 # multiply it by a constant and add a base amount
-                height = len(text) * 20 + 130 
+                height = len(text) * 25 + 130 
                 rp.log.debug("Length of  max error string is: %d " 
                              "and height is %d" % (length, height))
             else:
@@ -278,11 +282,19 @@ class ErrorMsg(Message):
             rp.log.debug("Length of error string is: %d, "
                          "and height is: %d" % (length, height))
  
-        width = length * 5 + 170 # length * 5 because each char is probably 
-                                # about 5 px across. + 10 for padding
+        width = length * 5 + 160 # length * 5 because each char is probably 
+                                 # about 5 px across. + 160 for padding
         rp.log.debug("Width of ErrorMsg is %d: " % width)
         self.set_dimensions(master, width, height)
     
+
+    def addIcon(self):
+        """
+            Adds an error icon to the popup box
+        """
+        self.img = PhotoImage(file = 'images/error.png')
+        self.tk.call('wm', 'iconphoto', self._w, self.img)
+
 
 class InvalidArg(ErrorMsg):
 
@@ -334,7 +346,7 @@ class Fonts():
     _M = 10
     _SM = 7
     _H1 = 25
-     
+
     def SM():
         sm = font.Font(family = Fonts._VERDANA, size = Fonts._SM)
         return sm
@@ -343,10 +355,10 @@ class Fonts():
                          underline = True)
         return sm_u
 
-    def MED():
+    def M():
         m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
         return m
-    def MED_U():
+    def M_U():
         med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
                          underline = True)
         return med_u
@@ -539,10 +551,10 @@ class CurrentImg(Frame, ImageFormat):
         self.subFrame.pack_propagate(0)
         self.subFrame.pack()
        
-        font_to_use = Fonts.XL_U()
+        font_to_use = Fonts.L_U()
         # set font to be smaller if title is too long
         if len(im.title) > 150:
-            font_to_use = Fonts.L_U()
+            font_to_use = Fonts.M_U()
         
         # create title link
         self.linkLabel = ttk.Label(self.subFrame, text = im.title,
@@ -820,12 +832,13 @@ class PastImgs(Frame, ImageFormat):
             self.txtFrame.pack()
             # title label 
             # adjust font size if title is too long 
-            if len(im.title) > 155:
-                im.title = im.title[:155] + '...'
+            font_to_use = Fonts.M()
+            if len(im.title) > 120:
+                im.title = im.title[:120] + '...'
             elif len(im.title) > 100:
                 font_to_use = Fonts.SM()
             else:
-                font_to_use = Fonts.MED()
+                font_to_use = Fonts.SM()
 
             self.title = ttk.Label(self.txtFrame, text = im.title,
                                font = font_to_use, wraplength = 325)
@@ -836,7 +849,7 @@ class PastImgs(Frame, ImageFormat):
             
             # link to post
             self.link = ttk.Label(self.botTxtFrame, text = "Link",
-                              font = Fonts.MED_U(),
+                              font = Fonts.M_U(),
                               cursor = Fonts._CURSOR, foreground = Fonts._HYPERLINK)
             self.link.pack(side = "left", anchor = 'w')
 # how to remember variable in a for loop: 
@@ -845,7 +858,7 @@ class PastImgs(Frame, ImageFormat):
             
             # set as wallpaper
             self.setAs = ttk.Label(self.botTxtFrame, text = "Set as Wallpaper",
-                               font = Fonts.MED_U(), cursor = Fonts._CURSOR,
+                               font = Fonts.M_U(), cursor = Fonts._CURSOR,
                                foreground = Fonts._HYPERLINK)
             self.setAs.pack(side = "left", anchor = 'w')
             self.setAs.bind("<Button-1>", self.make_wallpaper(im))
@@ -959,7 +972,7 @@ class Settings(Frame):
         self.maxLabel = ttk.LabelFrame(self.midTop, text = "# of Posts")
         self.maxFrame = Frame(self.maxLabel)
         self.maxTxt = ttk.Label(self.maxFrame, text = "Max posts:")
-        self.maxTxt.pack(side = "left", padx = (5, 0))
+        self.maxTxt.pack(side = "left", padx = (0, 5))
         self.maxE = ttk.Entry(self.maxFrame, width = 3)
         self.maxE.insert(0, rp.Config.maxposts())
         self.maxE.pack(side = "left", padx = 5, pady = 5)
@@ -972,7 +985,7 @@ class Settings(Frame):
         
         # category border and frame
         self.cat = ttk.LabelFrame(self.topRt, text = "Section")
-        self.catFrame = Frame(self.cat, width = 194, height = 30)
+        self.catFrame = Frame(self.cat, width = 185, height = 25)
         self.catFrame.pack_propagate(0)
 
         # download location border
@@ -981,7 +994,7 @@ class Settings(Frame):
         # Single link border
         self.singleF = ttk.LabelFrame(self, text = "Direct download link  "\
                                         "ex. https://i.imgur.com/rhd1TFF.jpg")
-        self.singleE = ttk.Entry(self.singleF, width = 44)
+        self.singleE = ttk.Entry(self.singleF, width = 63)
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
@@ -991,14 +1004,14 @@ class Settings(Frame):
         self.letsGo = ttk.Button(self, text = "Let's Go!")
       
         # subreddit entry
-        self.subreddits = ttk.Entry(self.subredditF, width = 59)
+        self.subreddits = ttk.Entry(self.subredditF, width = 78)
         self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = 5,
-                             sticky = "w", pady = 5, ipadx = 2)
+                             sticky = "w", pady = 5, ipadx = 3)
         # "download to" entry
         self.dlTxt = ttk.Label(self.dlFrame, text = "Download pictures to:") 
         self.dlTxt.grid(row = 0, column = 0, padx = 5, sticky = "w")
-        self.dlLoc = ttk.Entry(self.dlFrame, width = 41)
+        self.dlLoc = ttk.Entry(self.dlFrame, width = 57)
         self.dlLoc.insert(0, rp.Config.downloadLoc())
         self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = 5, pady = 5,
                         ipadx = 1)
@@ -1055,11 +1068,11 @@ class Settings(Frame):
         self.ctFrame.pack(side = "top")
        
         # category dropdown
-        self.choices = ["Hot", "New", "Rising", "Top", "Controversial"]
+        self.choices = ["Top", "Top", "Hot", "New", "Rising", "Controversial"]
         self.catVar = StringVar(self)
         self.catVar.set(rp.Config.category())
         self.catDD = ttk.OptionMenu(self.catFrame, self.catVar, *self.choices)
-        self.catDD.config(width = 10)
+        self.catDD.config(width = 14)
         self.catDD.pack(side = "right", anchor = "e", padx = (0, 5), pady = 5) 
         self.catTxt = ttk.Label(self.catFrame, text = "Category:")
         self.catTxt.pack(side = "left", anchor = "e", padx = (5, 0))
@@ -1081,14 +1094,14 @@ class Settings(Frame):
         self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
                              padx = (15, 5))
         self.res.pack(side = "top")
-        self.midTop.pack(side = "left", padx = 5) 
+        self.midTop.pack(side = "left", padx = 25) 
         self.checks.pack(side = "top")
         self.checksFrame.pack(side = "top", anchor = "nw",\
                          padx = 5)
         self.maxLabel.pack(side = "top", pady = 10)
         # cycletime and category frame
-        self.ct.pack(side = "top")
-        self.cat.pack(side = "bottom", pady = 5)
+        self.cat.pack(side = "top")
+        self.ct.pack(side = "bottom", pady = 5)
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
     
@@ -1138,6 +1151,8 @@ class Settings(Frame):
             errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
+        if values['-dl'][values['-dl'].rfind('\\'):] != values['-dl'][-1:]:
+            errors.append("Make sure path ends with a '\\' " + values['-dl'])
 
         return errors
 
@@ -1201,10 +1216,10 @@ class About(Frame):
         # author
         self.authorTxt = ttk.Label(self.subAuthorFrame,
                                text = "This program was created by: ",\
-                               font = Fonts.L())
+                               font = Fonts.M())
         self.authorLink = ttk.Label(self.subAuthorFrame, 
                                     text="/u/camerongagnon", 
-                                    font = Fonts.L_U(), 
+                                    font = Fonts.M_U(), 
                                     foreground = Fonts._HYPERLINK,
                                     cursor = Fonts._CURSOR)
 
@@ -1213,20 +1228,20 @@ class About(Frame):
         self.vNum.set("Version: " + rp.AboutInfo.version() + "." +
                       AboutInfo.version())
         self.version = ttk.Label(self.versionFrame, text = self.vNum.get(),
-                             font = Fonts.L())
+                             font = Fonts.M())
         
         # donate text/link
         self.donateTxt = ttk.Label(self.donateFrame,
                                text = "If you enjoy this program, "
                                       "please consider making a donation ",
-                               font = Fonts.L())
+                               font = Fonts.M())
         self.subDonateFrame = Frame(self.donateFrame)
         self.donateTxt2 = ttk.Label(self.subDonateFrame,
                                 text = "to the developer at the following "
                                        "link,",
-                                font = Fonts.L()) 
+                                font = Fonts.M()) 
         self.donateLink = ttk.Label(self.subDonateFrame, text = "here.",
-                                    font = Fonts.L_U(),
+                                    font = Fonts.M_U(),
                                     foreground = Fonts._HYPERLINK,
                                     cursor = Fonts._CURSOR) 
 
@@ -1234,19 +1249,19 @@ class About(Frame):
         self.feedback = ttk.Label(self.feedFrame,
                                   text = "To provide comments/feedback, please "
                                          "do one of the following: ",
-                                  font = Fonts.L())
+                                  font = Fonts.M())
         self.feedback1 = ttk.Label(self.feedFrame, 
                                    text = "1. Go to /r/reddit_paper and create a "
                                           "new post.",
-                                   font = Fonts.L())
+                                   font = Fonts.M())
         self.feedback2 = ttk.Label(self.feedFrame,
                                    text = "2. Follow the account "
                                           "link at the top and send me a PM.",
-                                   font = Fonts.L())
+                                   font = Fonts.M())
         self.feedback3 = ttk.Label(self.feedFrame,
                                    text = "3. Email me directly at "
                                           "cameron.gagnon@gmail.com",
-                                   font = Fonts.L())
+                                   font = Fonts.M())
 
         # send crashReport
         self.crash_loc = StringVar()
@@ -1256,11 +1271,11 @@ class About(Frame):
         self.report = ttk.Label(self.crashFrame,
                                 text = "To send a crash report, browse to "
                                        "the location below and send the ",
-                                font = Fonts.L(),
+                                font = Fonts.M(),
                                 wraplength = 480)
         self.report1 = ttk.Label(self.crashFrame,
                                 text = "log to cameron.gagnon@gmail.com.", 
-                                font = Fonts.L(), 
+                                font = Fonts.M(), 
                                 wraplength = 480)
 
         self.crash_loc = ttk.Label(self.crashFrame, text = self.crash_loc.get(),
