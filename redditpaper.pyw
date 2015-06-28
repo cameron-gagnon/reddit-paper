@@ -571,6 +571,7 @@ class Config():
             category = config.get('Options', 'Category')
             firstLetter = category[0].upper()
             category = firstLetter + category[1:]
+            log.debug("Category is: %s" % category)
             return category
         return "Hot"
 
