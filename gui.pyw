@@ -131,7 +131,7 @@ class Application(Tk):
 
  
     def addIcon(self):
-        self.img = PhotoImage(file = 'images/reddit.png')
+        self.img = PhotoImage(file = 'images/rp_sq.png')
         self.tk.call('wm', 'iconphoto', self._w, self.img)
 
         
@@ -1070,10 +1070,11 @@ class Settings(Frame):
         self.ctFrame.pack(side = "top")
        
         # category dropdown
-        self.choices = ["Top", "Top", "Hot", "New", "Rising", "Controversial"]
+        self.choices = ["Top", "Hot", "New", "Rising", "Controversial"]
         self.catVar = StringVar(self)
-        self.catVar.set(rp.Config.category())
-        self.catDD = ttk.OptionMenu(self.catFrame, self.catVar, *self.choices)
+        self.optionVar = rp.Config.category()
+        self.catVar.set(self.optionVar)
+        self.catDD = ttk.OptionMenu(self.catFrame, self.catVar, self.optionVar, *self.choices)
         self.catDD.config(width = 14)
         self.catDD.pack(side = "right", anchor = "e", padx = (0, 5), pady = 5) 
         self.catTxt = ttk.Label(self.catFrame, text = "Category:")
