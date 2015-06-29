@@ -1,8 +1,8 @@
 import sys
 from cx_Freeze import setup, Executable
 
-executables = [Executable("gui.pyw", base = ("Win32GUI" if sys.platform == 'win32' else None), icon = "./images/redditicon_48.ico", targetName = "Reddit Paper.exe")]
-included_files = ["./images", "redditpaper.pyw", "detools",
+executables = [Executable("gui.py", base = ("Win32GUI" if sys.platform == 'win32' else None), icon = "./images/rp_sq_48.ico", targetName = "Reddit Paper.exe")]
+included_files = ["./images", "redditpaper.py", "detools",
 		  "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini"]
 
 install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter"]
