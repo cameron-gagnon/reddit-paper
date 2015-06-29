@@ -1138,8 +1138,9 @@ class Settings(Frame):
             errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
-
-        return errors
+        if values['-dl'][values['-dl'].rfind('/'):] != values['-dl'][-1:]:
+            errors.append("Make sure path ends with a '/' " + values['-dl'])
+            return errors
 
 
     def get_pics(self, event):

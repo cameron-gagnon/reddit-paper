@@ -374,7 +374,7 @@ class Config():
     """
         Values used to initiate the settings file.
     """
-    default_values = {'DOWNLOADLOCATION': os.getcwd(),
+    default_values = {'DOWNLOADLOCATION': os.getcwd() + "/",
                       'MINWIDTH': 1024,
                       'MINHEIGHT': 768,
                       'SUBREDDITS': "futureporn+earthporn+"
