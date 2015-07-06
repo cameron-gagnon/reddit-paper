@@ -45,9 +45,8 @@ from socket import timeout
 from urllib.error import HTTPError,URLError
 from requests.exceptions import ConnectionError
 from collections import OrderedDict
-#sets up global vars
+#sets up global var
 USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
-
 
 # MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
 # FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
@@ -67,16 +66,18 @@ def main(argList = None):
     global sql
     try:
         # preliminary functions
-        Config_logging()
-        log.debug("In rp.main()")
+        print("in main")
         args = Parse_cmd_args(argList)
         config = Config.config(args)
         
         db = Database()    
         log.debug("past database connection")
         r = Connected("https://www.reddit.com/.json")
+        
+
         # this is the main function that will download and parse
         # the images
+
         Main_photo_controller(r)
         Cycle_wallpaper()
 
@@ -91,10 +92,9 @@ def main(argList = None):
         Config.writeStatusBar("")
         sql.close()
         sys.exit(0)
-    except:
-        log.error("ERROR IN PROGRAM", exc_info = True)
-        pass
 
+    except:
+        log.debug("Unknown error occured", exc_info = True)
 
 ####################################################################
 ### CLASS IMPLEMNTATIONS
@@ -212,7 +212,7 @@ class SingleImg(Img):
         picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
     
         try:
-            picdl = urllib.request.urlopen(picdl)
+            picdl = urllib.request.urlopen(picdl, cafile = 'cacert.pem')
         
         except urllib.error.HTTPError:
             log.exception("Could not open the specified picture webpage!!\n",
@@ -284,8 +284,6 @@ class PictureList():
         try:
             cur.execute('SELECT * FROM oldposts')
         except sqlite3.OperationalError:
-#log.debug("First time running program, "
-#          "no table 'oldposts' in DB file")
             # return empty list so when iterating the fn 
             # has no objects to iterate over
             return image_list 
@@ -653,11 +651,13 @@ def Config_logging():
 #         false if not able to connect, or timesout
 def Connected(url):
     r = praw.Reddit(user_agent = USERAGENT)
+
     try:
         uaurl = urllib.request.Request(url,
                  headers={'User-Agent' : USERAGENT})
         url = urllib.request.urlopen(uaurl,
-                                     timeout = 3)
+                                     timeout = 3,
+                                     cafile = 'cacert.pem')
 
         content = url.read().decode('utf-8')
         json.loads(content)
@@ -720,7 +720,7 @@ def General_parser(img_link):
 def Flickr_parse(url):
     try:
         # gets the page and reads the hmtl into flickr_html
-        flickr_html = urllib.request.urlopen(url).read()
+        flickr_html = urllib.request.urlopen(url, cafile = 'cacert.pem').read()
         # searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
         
@@ -772,7 +772,7 @@ def Flickr_parse(url):
 def Five00px_parse(url):
     try:
         #refer to Flickr_parse for explanation of this method
-        px_html = urllib.request.urlopen(url)
+        px_html = urllib.request.urlopen(url, cafile = 'cacert.pem')
     
         img_html = BeautifulSoup(px_html)
         
@@ -797,7 +797,7 @@ def Five00px_parse(url):
 def Deviant_parse(url, regex):
     try:
 
-        dev_html = urllib.request.urlopen(url)
+        dev_html = urllib.request.urlopen(url, cafile = 'cacert.pem')
 
         # direct image download link that must begin with
         # fc or orig or pree
@@ -856,7 +856,7 @@ def Imgur_image_format(url):
 # MODIFIES the link that gets passed as the download link
 # EFFECTS Returns the direct link to download the image
 def Early_canvas_parser(url):
-    html = urllib.request.urlopen(url)
+    html = urllib.request.urlopen(url, cafile = 'cacert.pem')
     html = BeautifulSoup(html)
     div = html.select('.item-image')[0]
     url = div.findChildren()[0].get('src')
@@ -892,7 +892,7 @@ def Imgur_parse(url, regex):
     elif (url.find('/a/') != -1):
         # have to find new url to download the first image from album
         uaurl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
-        imgur_html = urllib.request.urlopen(uaurl)
+        imgur_html = urllib.request.urlopen(uaurl, cafile = 'cacert.pem')
         soup = BeautifulSoup(imgur_html)
         
         #   | class=image  w/ child <a> | gets href of this <a> child |
@@ -1138,11 +1138,11 @@ def Download_img(url, im):
     global image_list
     
     # gets the pic download information and sets the download location
-    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
+    picdl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
     log.debug("URL is: %s", url)
     
     try:
-        picdl = urllib.request.urlopen(picdl)
+        picdl = urllib.request.urlopen(picdl, cafile = 'cacert.pem')
 
     except (urllib.error.HTTPError, urllib.error.URLError):
         log.exception("ERROR: occured in Setting up the url!!\n",
@@ -1181,6 +1181,7 @@ def Main_photo_controller(r):
 
     i = 1        
     posts = MAXPOSTS
+
     for i, post in enumerate(r.get_content(url=URL,limit = MAXPOSTS),start = 1):
         
         # creates image class which holds necessary data about post
@@ -1311,7 +1312,8 @@ def Parse_cmd_args(args = None):
     a['MINWIDTH'] = int(args['-mw'])
     a['MINHEIGHT'] = int(args['-mh'])
     a['MAXPOSTS'] = int(args['-mp'])
-    a['CYCLETIME'] = int(args['-t'])
+    print("TIME TO CYCLE IS %.2f" % float(args['-t']))
+    a['CYCLETIME'] = float(args['-t'])
     a['CATEGORY'] = args['-c']
     log.debug("SUBREDDIT is %s", args['-s'])
     a['SUBREDDITS'] = args['-s']

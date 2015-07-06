@@ -16,6 +16,7 @@ from tkinter import ttk
 from PIL import Image
 from praw import errors
 
+os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(os.getcwd(), "cacert.pem")
 
 class Application(Tk):
     width = 525
@@ -1000,7 +1001,7 @@ class Settings(Frame):
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
-        self.singleB.bind("<Button-1>", lambda x: rp.Single_link(self.singleE.get()))
+        self.singleB.bind("<Button-1>", lambda e: rp.Single_link(self.singleE.get()))
 
         # Buttons
         self.letsGo = ttk.Button(self, text = "Let's Go!")
@@ -1084,7 +1085,7 @@ class Settings(Frame):
         # packs/binds
         # button packs
         self.letsGo.pack(side = "bottom", anchor = "center", pady = (10, 30))
-        self.letsGo.bind("<Button-1>", self.get_pics)
+        self.letsGo.bind("<Button-1>", lambda e: self.get_pics())
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
@@ -1124,7 +1125,9 @@ class Settings(Frame):
         try:
             # convert hours to minutes, then add it to minutes, so we 
             # are only dealing with total minutes in the end
-            totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
+            totalTime = float(self.ctHourE.get()) * 60
+            totalTime += float(self.ctMinE.get())
+            print("TOTAL TIME IS:::: %.2f" % totalTime)
             self.values['-t'] = totalTime
             CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +
                                    float(self.ctMinE.get()) * 60000)
@@ -1162,8 +1165,7 @@ class Settings(Frame):
 
         return errors
 
-
-    def get_pics(self, event):
+    def get_pics(self):
         """ 
             Makes the call to redditpaper.main() to
             start the wallpaper scraper part of the
@@ -1194,7 +1196,10 @@ class Settings(Frame):
         rp.log.debug("Argument list is: " + self.argList)
         
         # should have all valid arguments at this point
-        rp.main(self.args)
+        try:
+            rp.main(self.args)
+        except:
+            raise
 
     def __str__(self):
         return "Settings"
