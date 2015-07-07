@@ -373,10 +373,14 @@ class Config():
 
     dir_ = os.path.expanduser("~") + "\\Pictures\\RedditPaper\\"
     try:
+        # tries to create this directory, if it already exists
+        # then we're good to go
         os.makedirs(dir_)
     except FileExistsError:
         pass
     except:
+        # excepts any other error and creates an image folder
+        # in the directory where the program was downloaded to
         dir_ = os.getcwd() + "\\Downloaded Images\\"
 
     default_values = {'DOWNLOADLOCATION': dir_,
