@@ -16,7 +16,7 @@ build_exe_options = {
 
 setup(
         name = "Reddit Paper",
-        version = "1.0",
+        version = "1.1",
         author = "Cameron Gagnon",
         author_email = 'cameron.gagnon@gmail.com',
         url = "http://github.com/cameron-gagnon/reddit-paper",
