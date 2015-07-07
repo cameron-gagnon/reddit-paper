@@ -168,6 +168,7 @@ class AboutInfo():
                   "business=PKYUCH3L9HJZ6&lc=US&item_name=Cameron%20Gagnon"\
                   "&item_number=81140022&currency_code=USD&bn=PP%2dDonations"\
                   "BF%3abtn_donateCC_LG%2egif%3aNonHosted"
+    _github = "https://github.com/cameron-gagnon/reddit-paper"
     
     def version():
         return AboutInfo._version
@@ -183,6 +184,9 @@ class AboutInfo():
     
     def email():
         return AboutInfo._email
+
+    def GitHub():
+        return AboutInfo._github
 
 
 ######################## Classes for Messages #################################
@@ -1273,6 +1277,18 @@ class About(Frame):
                                    text = "3. Email me directly at "
                                           "cameron.gagnon@gmail.com",
                                    font = Fonts.M())
+        self.githubFrame = Frame(self.feedFrame)
+        self.number4 = ttk.Label(self.githubFrame,
+                                   text = "4.",
+                                   font = Fonts.M())
+        self.githubLink = ttk.Label(self.githubFrame,
+                                   text = "File a bug/create a pull request",
+                                   font = Fonts.M_U(),
+                                   foreground = Fonts._HYPERLINK,
+                                   cursor = Fonts._CURSOR)
+        self.feedback4 = ttk.Label(self.githubFrame,
+                                   text = "because this code is open source!!",
+                                   font = Fonts.M())
 
         # send crashReport
         self.crash_loc = StringVar()
@@ -1313,18 +1329,25 @@ class About(Frame):
         self.donateFrame.pack(side = "top", fill = "x", padx = (10, 15), 
                               pady = (10, 0))
         self.subDonateFrame.pack(side = "top")
+        
         # feedback
         self.feedback.pack(side = "top", anchor = 'center', pady = (5, 0))
         self.feedback1.pack(side = "top", anchor = 'center')
         self.feedback2.pack(side = "top", anchor = 'center')
-        self.feedback3.pack(side = "top", anchor = 'center', pady = (0, 5))
-
+        self.feedback3.pack(side = "top", anchor = 'center')
+        self.number4.pack(side = "left", anchor = 'center')
+        self.githubLink.pack(side = "left", anchor = 'center')
+        self.githubLink.bind("<Button-1>",
+                            lambda x: self.open_link(AboutInfo.GitHub()))
+        self.feedback4.pack(side = "left", anchor = 'center')
+        self.githubFrame.pack(side = "top", anchor = 'center', pady = (0, 5))
         self.feedFrame.pack(side = "top", fill = "x", padx = (10, 15),
                             pady = (10, 0))
+
         # crash report pack
         self.report.pack(side = "top", anchor = 'center')
         self.report1.pack(side = "top", anchor = 'center')
-        self.crash_loc.pack(side = "top")
+        self.crash_loc.pack(side = "top", pady = (0, 5))
         self.crashFrame.pack(side = "top", fill = "x", padx = (10, 15), 
                              pady = (10, 0))
         
