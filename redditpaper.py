@@ -56,30 +56,37 @@ USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
 # that != width/height requirements. This is
 # because in Cycle_wallpaper, it will cycle
 # the list of images from 0 to MAXPOSTS
-image_list = []
+
 
 
 # make sure to have a file in the same directory with your username
 # on the first line, and password on the second
 def main(argList = None):
-    global cur
-    global sql
+    image_list = []
     try:
         # preliminary functions
-        print("in main")
+        try:
+            if log:
+                pass
+        except NameError:
+            # likely occurs when log is not
+            # defined, so we must define it
+            Config_logging()
+
         args = Parse_cmd_args(argList)
         config = Config.config(args)
         
-        db = Database()    
-        log.debug("past database connection")
+        Database()    
+        sql, cur = Database.connect_to_DB()
+        log.debug("made database connection")
         r = Connected("https://www.reddit.com/.json")
         
 
         # this is the main function that will download and parse
         # the images
 
-        Main_photo_controller(r)
-        Cycle_wallpaper()
+        Main_photo_controller(r, image_list)
+        Cycle_wallpaper(image_list)
 
         sql.close()
         # this is printed for ease of use when viewing the debug file
@@ -306,10 +313,12 @@ class AboutInfo():
 ########################################################################
 class Database():
 
-    def __init__(self): #Create_DB()
-        global sql
+    def __init__(self):
         global cur
-           
+        global sql
+        """
+            creates the database if it does not exist already
+        """
         log.info("Accessing database for submission ID's")
         sql, cur = Database.connect_to_DB() 
         # create image database
@@ -319,7 +328,6 @@ class Database():
     
         # commit dem changes yo
         sql.commit()
-
 
     # connects to the wallpaper.db which holds the image info
     def connect_to_DB():
@@ -383,7 +391,7 @@ class Config():
         # in the directory where the program was downloaded to
         dir_ = os.getcwd() + "\\Downloaded Images\\"
 
-    default_values = {'DOWNLOADLOCATION': dir_,
+    default_values = {'DWNLDLOC': dir_,
                       'MINWIDTH': 1024,
                       'MINHEIGHT': 768,
                       'SUBREDDITS': "futureporn+earthporn+"
@@ -411,7 +419,7 @@ class Config():
         config['Statusbar'] = OrderedDict([('Statusbar Text',
                                             args['STATUSBAR'])])
         config['Save Location'] = OrderedDict([('Directory',
-                                                args['DOWNLOADLOCATION'])])
+                                                args['DWNLDLOC'])])
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
                                          ('Minheight', args['MINHEIGHT']),
                                          ('Subreddits', args['SUBREDDITS']),
@@ -511,7 +519,7 @@ class Config():
         args['NSFW'] = config.getboolean('Adult Content', 'NSFW',
                                          fallback = False)
         dir_ = os.getcwd() + "\\Downloaded Images\\"
-        args['DOWNLOADLOCATION'] = config.get('Save Location', 'Directory',
+        args['DWNLDLOC'] = config.get('Save Location', 'Directory',
                                               fallback = dir_)
         URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + \
                                             args['CATEGORY'] + "/"
@@ -704,9 +712,20 @@ def Single_link(link):
 def General_parser(img_link):
     if img_link == []:
         return False
-        
-    remove_index = img_link.rindex('/')                        
+    try:
+        remove_index = img_link.rindex('/')                        
+    except ValueError:
+        # occurs when index is not found
+        log.debug("'/' in img_link is not found", exc_info = True)
+        return False
     image_name =  img_link[-(len(img_link) - remove_index - 1):]
+    
+    index = image_name.rfind('.jpg?')
+    if index != -1:
+        # strips off '?1020a0747' from some image names
+        # that have misc. characters after the .jpg
+        image_name = image_name[:index + 4]
+
     return image_name
 
 
@@ -1139,8 +1158,7 @@ def Lookup_width_height(im):
 #EFFECTS  Prints out the download name and location, then saves the
 #         picture to that spot.
 def Download_img(url, im):
-    global image_list
-    
+
     # gets the pic download information and sets the download location
     picdl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
     log.debug("URL is: %s", url)
@@ -1173,8 +1191,7 @@ def Download_img(url, im):
 #MODIFIES download location, adds new picture to file
 #EFFECTS  Downloads a new picture from the url specified and saves
 #         it to the location specified from Config.downloadLoc().
-def Main_photo_controller(r):
-    global image_list
+def Main_photo_controller(r, image_list):
     global MAXPOSTS
     
     Config.writeStatusBar("Fetching %s posts from specified "
@@ -1266,8 +1283,7 @@ def Main_photo_controller(r):
 #MODIFIES wallpaper background of the computer
 #EFFECTS  Cycles through the wallpapers that are given by the titles
 #         in the image_list list, based on the CYCLETIME
-def Cycle_wallpaper():
-    global image_list
+def Cycle_wallpaper(image_list):
     
     log.debug("NUM OF IMAGES IS: %s", len(image_list))
     Config.writeStatusBar("%d images downloaded" % len(image_list))
@@ -1309,33 +1325,105 @@ def Parse_cmd_args(args = None):
     global URL
     global SUBREDDITS
     global NSFW
-    global DOWNLOADLOCATION
+    global DWNLDLOC
 
+
+
+    default = Config.read_config()
+
+    parser = argparse.ArgumentParser(description="Downloads"
+            " images from user specified subreddits and sets"
+            " them as the wallpaper.", prog="redditpaper.py")
+
+    parser.add_argument("-mw", "--minwidth", type = int,
+                        help="Minimum width of picture required "
+                             "to download",
+                        default = default['MINWIDTH'])
+
+    parser.add_argument("-mh", "--minheight", type = int,
+                        help="Minimum height of picture required "
+                             "to download",
+                        default = default['MINHEIGHT'])
+
+    parser.add_argument("-mp", "--maxposts", type = int,
+                        help="Amount of images to check and "
+                             "download",
+                        default = default['MAXPOSTS'])
+
+    parser.add_argument("-t", "--cycletime", type = float,
+                        help="Amount of time (in minutes) each image "
+                             "will be set as wallpaper",
+                        default = default['CYCLETIME'])
+
+    parser.add_argument("-c", "--category", type = str,
+                        choices = ['hot', 'new', 'rising', 'controversial',\
+                                   'top'],
+                        default = default['CATEGORY'],
+                        help="Options: hot, new, rising, top")
+    # parser.add_argument("-l", "--link", type = str, default = None,
+    #                     help="Provide a direct image link to download"
+    #                          " just the specified link") 
+    parser.add_argument("-s", "--subreddits", 
+                        type = str,
+                        help="Enter a list of mostly image subreddits "
+                             "pull the top images from those subreddits",
+                        default = default['SUBREDDITS'])
+
+    parser.add_argument("--nsfw", 
+                        help="--nsfw will filter images "
+                             "out if they are NSFW",
+                        default = default['NSFW'],
+                        type = int)
+
+    parser.add_argument("-dl", "--downloadLoc",
+                        type = str,
+                        help="Set the file location where the pictures "
+                             "will be downloaded to. EX. "
+                             "C:\\Users\\USERNAME\\pictures\\. Be sure to "
+                             "include the last forward/backward slash.",
+                        default = default['DWNLDLOC'])
+
+    args = parser.parse_args()
     log.debug("parsing command args: %s" % args)
+
     a = {}
-    a['MINWIDTH'] = int(args['-mw'])
-    a['MINHEIGHT'] = int(args['-mh'])
-    a['MAXPOSTS'] = int(args['-mp'])
-    print("TIME TO CYCLE IS %.2f" % float(args['-t']))
-    a['CYCLETIME'] = float(args['-t'])
-    a['CATEGORY'] = args['-c']
-    log.debug("SUBREDDIT is %s", args['-s'])
-    a['SUBREDDITS'] = args['-s']
-    a['NSFW'] = args['--nsfw']
-    a['DOWNLOADLOCATION'] = args['-dl']
-    a['STATUSBAR'] = "" 
-    
     # declare as global so rest of program can see the values
-    MINWIDTH   =  a['MINWIDTH'] 
-    MINHEIGHT  =  a['MINHEIGHT']
-    MAXPOSTS   =  a['MAXPOSTS'] 
-    CYCLETIME  =  a['CYCLETIME']
-    CATEGORY   =  a['CATEGORY'] 
-    SUBREDDITS =  a['SUBREDDITS']
-    NSFW       =  a['NSFW']
-    DOWNLOADLOCATION = a['DOWNLOADLOCATION'] 
+    MINWIDTH    =  a['MINWIDTH']   =  args.minwidth
+    MINHEIGHT   =  a['MINHEIGHT']  =  args.minheight
+    MAXPOSTS    =  a['MAXPOSTS']   =  args.maxposts
+    CYCLETIME   =  a['CYCLETIME']  =  args.cycletime
+    CATEGORY    =  a['CATEGORY']   =  args.category
+    SUBREDDITS  =  a['SUBREDDITS'] =  args.subreddits
+    NSFW        =  a['NSFW']       =  args.nsfw
+    DWNLDLOC    =  a['DWNLDLOC']   =  args.downloadLoc
+    a['STATUSBAR']  =  ""
+    
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
-    log.debug("made it past parsing")
+    log.debug("SUBREDDIT is %s", args.subreddits)
+
+    # a['MINWIDTH'] = int(args['-mw'])
+    # a['MINHEIGHT'] = int(args['-mh'])
+    # a['MAXPOSTS'] = int(args['-mp'])
+    # print("TIME TO CYCLE IS %.2f" % float(args['-t']))
+    # a['CYCLETIME'] = float(args['-t'])
+    # a['CATEGORY'] = args['-c']
+    # log.debug("SUBREDDIT is %s", args['-s'])
+    # a['SUBREDDITS'] = args['-s']
+    # a['NSFW'] = args['--nsfw']
+    # a['DOWNLOADLOCATION'] = args['-dl']
+    # a['STATUSBAR'] = "" 
+    
+    # # declare as global so rest of program can see the values
+    # MINWIDTH   =  a['MINWIDTH'] 
+    # MINHEIGHT  =  a['MINHEIGHT']
+    # MAXPOSTS   =  a['MAXPOSTS'] 
+    # CYCLETIME  =  a['CYCLETIME']
+    # CATEGORY   =  a['CATEGORY'] 
+    # SUBREDDITS =  a['SUBREDDITS']
+    # NSFW       =  a['NSFW']
+    # DWNLDLOC = a['DWNLDLOC'] 
+    # URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
+    # log.debug("made it past parsing")
     return a
 
 

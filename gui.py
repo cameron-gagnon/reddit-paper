@@ -9,6 +9,7 @@ import webbrowser
 import os
 import subprocess
 import time
+import threading
 from tkinter import *
 from tkinter import font
 from tkinter import StringVar
@@ -748,25 +749,48 @@ class PastImgs(Frame, ImageFormat):
                 try:
                     self.frames[i].destroy()
                 except AttributeError:
+                    # occurs when a frame is supposed to be present
+                    # but actually isn't
+                    rp.log.debug("Frame isnt present")
                     pass
 
+                # resize the past images canvas
                 canvasHeight = self.canvas.winfo_height()
                 self.canvas.configure(height = canvasHeight - 50,
                                       scrollregion = self.canvas.bbox('all'))
                 # delete image from computer
                 try:
+                    rp.log.debug("self.photos[i][0] is: %s" % self.photos[i][0])
+                    rp.log.debug("self.photos[i][1] is: %s" % self.photos[i][1])
+                    rp.log.debug("self.photos[i][2] is: %s" % self.photos[i][2])
+
                     os.remove(self.photos[i][0])
+                    rp.log.debug("Removed self.photos[i][0]")
+
                     os.remove(self.photos[i][1]) 
+                    rp.log.debug("Removed self.photos[i][1]")
+
                     imageC = self.remove_C(self.photos[i][0], self.photos[i][2])
-                    os.remove(imageC)
-                    rp.log.debug("Deleting image: %s AND %s" %
-                                (self.photos[i][0], self.photos[i][0]))
+                    
+                    try:
+                        os.remove(imageC)
+                        rp.log.debug("Removed imageC: %s" % imageC)
+                    except FileNotFoundError:
+                        # image was likely not set as current image, may not
+                        # have been correct dimensions
+                        rp.log.debug("It appears that the image %s was never"
+                                     "set as a current image" % imageC)
+                        pass
+                    
                     rp.Database.del_img(self.photos[i][2])
-                except OSError:
-                    rp.log.debug("File not found when deleting...")
+
+                except (OSError, FileNotFoundError):
+                    rp.log.debug("File not found when deleting")
+                    rp.log.debug(self.photos[i])
                     pass
 
         # don't forget to destroy the popup!
+        self.selVar.set(False)
         popup.destroy()
        
     def remove_C(self, photoPath, photo):
@@ -1195,14 +1219,22 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-        
+        self.argList = "python.exe " + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         
         # should have all valid arguments at this point
         try:
-            rp.main(self.args)
+            # threaded fn call to run the rp.main part off of
+#            rpKwargs = {"argList": self.argList}
+#            rpRun = threading.Thread(target = rp.main(self.args),
+#                                     name = "Reddit Paper")
+            #rpRun.start()
+#            rp.main(self.args)
+            subprocess.Popen(self.argList.split())
         except:
+            # catch all errors from rp.main so we raise them
+            # and they don't get swallowed
             raise
 
     def __str__(self):
