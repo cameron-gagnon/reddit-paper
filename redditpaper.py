@@ -1327,42 +1327,43 @@ def Parse_cmd_args(args = None):
     global NSFW
     global DWNLDLOC
 
-
-
     default = Config.read_config()
 
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.", prog="redditpaper.py")
 
-    parser.add_argument("-mw", "--minwidth", type = int,
+    parser.add_argument("-mw", "--minwidth",
+                        type = int,
                         help="Minimum width of picture required "
                              "to download",
                         default = default['MINWIDTH'])
 
-    parser.add_argument("-mh", "--minheight", type = int,
+    parser.add_argument("-mh", "--minheight",   
+                        type = int,
                         help="Minimum height of picture required "
                              "to download",
                         default = default['MINHEIGHT'])
 
-    parser.add_argument("-mp", "--maxposts", type = int,
+    parser.add_argument("-mp", "--maxposts",
+                        type = int,
                         help="Amount of images to check and "
                              "download",
                         default = default['MAXPOSTS'])
 
-    parser.add_argument("-t", "--cycletime", type = float,
+    parser.add_argument("-t", "--cycletime",
+                        type = float,
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper",
                         default = default['CYCLETIME'])
 
-    parser.add_argument("-c", "--category", type = str,
+    parser.add_argument("-c", "--category",
+                        type = str,
                         choices = ['hot', 'new', 'rising', 'controversial',\
                                    'top'],
                         default = default['CATEGORY'],
                         help="Options: hot, new, rising, top")
-    # parser.add_argument("-l", "--link", type = str, default = None,
-    #                     help="Provide a direct image link to download"
-    #                          " just the specified link") 
+
     parser.add_argument("-s", "--subreddits", 
                         type = str,
                         help="Enter a list of mostly image subreddits "
@@ -1401,28 +1402,6 @@ def Parse_cmd_args(args = None):
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
     log.debug("SUBREDDIT is %s", args.subreddits)
 
-    # a['MINWIDTH'] = int(args['-mw'])
-    # a['MINHEIGHT'] = int(args['-mh'])
-    # a['MAXPOSTS'] = int(args['-mp'])
-    # print("TIME TO CYCLE IS %.2f" % float(args['-t']))
-    # a['CYCLETIME'] = float(args['-t'])
-    # a['CATEGORY'] = args['-c']
-    # log.debug("SUBREDDIT is %s", args['-s'])
-    # a['SUBREDDITS'] = args['-s']
-    # a['NSFW'] = args['--nsfw']
-    # a['DOWNLOADLOCATION'] = args['-dl']
-    # a['STATUSBAR'] = "" 
-    
-    # # declare as global so rest of program can see the values
-    # MINWIDTH   =  a['MINWIDTH'] 
-    # MINHEIGHT  =  a['MINHEIGHT']
-    # MAXPOSTS   =  a['MAXPOSTS'] 
-    # CYCLETIME  =  a['CYCLETIME']
-    # CATEGORY   =  a['CATEGORY'] 
-    # SUBREDDITS =  a['SUBREDDITS']
-    # NSFW       =  a['NSFW']
-    # DWNLDLOC = a['DWNLDLOC'] 
-    # URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
     # log.debug("made it past parsing")
     return a
 

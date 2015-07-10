@@ -8,7 +8,8 @@ executables = [Executable("gui.py",
                           shortcutDir = "DesktopFolder")] #base = ("Win32GUI" if sys.platform == 'win32' else None),]
 included_files = ["./images", "redditpaper.py", #"detools",
 		          "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
-                  "cacert.pem"]
+                  "cacert.pem",
+                  "C:\\Python34\\pythonw.exe"]
 
 install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter"]
 
