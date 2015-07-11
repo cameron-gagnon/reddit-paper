@@ -347,6 +347,23 @@ class ConfirmMsg(Message):
         B2.pack(side = "left")
 
 
+class AutoScrollbar(ttk.Scrollbar):
+    # a scrollbar that hides itself if it's not needed.  only
+    # works if you use the grid geometry manager.
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            # grid_remove is currently missing from Tkinter!
+            self.tk.call("grid", "remove", self)
+        else:
+            self.grid(sticky = 'nsew')
+
+        Scrollbar.set(self, lo, hi)
+    def pack(self, **kw):
+        raise Exception("cannot use pack with this widget")
+    def place(self, **kw):
+        raise Exception("cannot use place with this widget")
+
+
 ################################################################################
 class Fonts():
     _VERDANA = "Verdana"
@@ -568,9 +585,12 @@ class CurrentImg(Frame, ImageFormat):
             font_to_use = Fonts.M_U()
         
         # create title link
-        self.linkLabel = ttk.Label(self.subFrame, text = im.title,
-                               font = font_to_use, foreground = Fonts._HYPERLINK,
-                               cursor = Fonts._CURSOR, wraplength = 500)
+        self.linkLabel = ttk.Label(self.subFrame,
+                                   text = im.title,
+                                   font = font_to_use,
+                                   foreground = Fonts._HYPERLINK,
+                                   cursor = Fonts._CURSOR,
+                                   wraplength = 500)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
         self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
         
@@ -650,10 +670,15 @@ class PastImgs(Frame, ImageFormat):
         selectBox.pack(anchor = 'w', pady = (15, 2), padx = (35, 10))
 
         ### begin canvas/frame/picture list
-        self.picFrame = Frame(self, width = 450, height = 300)#bg = "blue",
+        self.picFrame = Frame(self, width = 450, height = 300)
+        
+        self.picFrame.grid_rowconfigure(0, weight = 1)
+        self.picFrame.grid_columnconfigure(0, weight = 1)
         self.picFrame.pack()
+        
         self.canvas = Canvas(self.picFrame, width = 450, height = 300)
         self.canFrame = Frame(self.canvas)
+
         self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
         self.canvas.pack(side="left")
         self.setScroll() 
@@ -665,10 +690,10 @@ class PastImgs(Frame, ImageFormat):
         self.checkBoxes = []
         self.frames = []
         self.photos = []
-        self.populate(self.canFrame, self.picList) 
+        self.populate(self.canFrame, self.picList)
 
         # bottom frame for buttons
-        self.bottomFrame = Frame(self)                          #bg = 'yellow')
+        self.bottomFrame = Frame(self)
         self.delete = ttk.Button(self.bottomFrame, text = "Delete selected", 
                                state = "normal",
                                command = lambda: ConfirmMsg(self))
@@ -683,9 +708,28 @@ class PastImgs(Frame, ImageFormat):
         self.updatePastImgs()
 
     def setScroll(self):
-        self.scroll = ttk.Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
+        # create frame to hold scrollbar so we can
+        # use grid on the scrollbar
+        self.scrollFrame = Frame(self.picFrame)
+
+        # set rows and column configures so we can
+        # make scrollbar take up entire row/column
+        self.scrollFrame.rowconfigure(1, weight = 1)
+        self.scrollFrame.columnconfigure(1, weight = 1)
+        self.scroll = AutoScrollbar(self.scrollFrame,
+                                    orient = "vertical",
+                                    command = self.canvas.yview)
+
+        # set scrollbar as callback to the canvas
         self.canvas.configure(yscrollcommand = self.scroll.set)
-        self.scroll.pack(side="right", fill="y")
+
+        # set the scrollbar to be the height of the canvas
+        self.scroll.grid(sticky = 'ns', row = 1, column = 0)
+
+        # set the scrollbar to be packed on the right side
+        self.scrollFrame.pack(side="right", fill="y")
+
+        # bind the picture frame to the 
         self.picFrame.bind("<Configure>", self.setFrame) 
 
     def setKeyBinds(self, widget):
@@ -717,12 +761,11 @@ class PastImgs(Frame, ImageFormat):
 
     def setFrame(self, event = None):
         """ Sets the canvas dimentions and the scroll area """
-        self.canvas.configure(scrollregion = self.canvas.bbox('all'),
-                              width = 450, height = 300)
+        self.canvas.configure(scrollregion = self.canvas.bbox('all'))
 
     def change_all(self, event):
         """
-            selects all the pictures (to be deleted)
+            selects/deselects all the pictures (to be deleted)
         """
         if self.selVar.get():
             self.selVar.set(True)
@@ -747,18 +790,23 @@ class PastImgs(Frame, ImageFormat):
             if box.get():
                 # deletes frame from canvas
                 try:
+                    canframe = self.canFrame.winfo_height()
+                    print(canframe)
                     self.frames[i].destroy()
+                    # reset scrollbar
+                    self.scroll.destroy()
+                    self.scrollFrame.destroy()
+                    canframe = self.canFrame.winfo_height()
+                    print(canframe)
+                    self.setScroll()
+
                 except AttributeError:
                     # occurs when a frame is supposed to be present
                     # but actually isn't
                     rp.log.debug("Frame isnt present")
                     pass
 
-                # resize the past images canvas
-                canvasHeight = self.canvas.winfo_height()
-                self.canvas.configure(height = canvasHeight - 50,
-                                      scrollregion = self.canvas.bbox('all'))
-                # delete image from computer
+
                 try:
                     rp.log.debug("self.photos[i][0] is: %s" % self.photos[i][0])
                     rp.log.debug("self.photos[i][1] is: %s" % self.photos[i][1])
@@ -785,12 +833,12 @@ class PastImgs(Frame, ImageFormat):
                     rp.Database.del_img(self.photos[i][2])
 
                 except (OSError, FileNotFoundError):
-                    rp.log.debug("File not found when deleting")
+                    rp.log.debug("File not found when deleting", exc_info = True)
                     rp.log.debug(self.photos[i])
                     pass
 
-        # don't forget to destroy the popup!
         self.selVar.set(False)
+        # don't forget to destroy the popup!
         popup.destroy()
        
     def remove_C(self, photoPath, photo):
@@ -818,7 +866,7 @@ class PastImgs(Frame, ImageFormat):
         """
             Fill the frame with more frames of the images
         """
-        for i, im in enumerate(self.picList):
+        for i, im in enumerate(picList):
             try:
                 with open(im.save_location, 'rb') as image_file:
                     imThumb = Image.open(image_file)
@@ -833,14 +881,17 @@ class PastImgs(Frame, ImageFormat):
                 # as an html document, so we append dummy variables
                 # so that the indexes will align properly with the
                 # variables later
-                self.checkBoxes.append(BooleanVar())
-                self.frames.append("Dummy Frame")
-                self.photos.append("Dummy Var")
+                #self.checkBoxes.append(BooleanVar())
+                #self.frames.append("Dummy Frame")
+                #self.photos.append("Dummy Var")
+                i -= 1
                 continue 
  
             # create frame to hold information for one picture
-            self.itemFrame = Frame(frame, width = 450, height = 50)#bg = 'pink')
+            self.itemFrame = Frame(frame, width = 450, height = 50)
             self.itemFrame.grid(row = i, column = 0)
+            rp.log.debug("SIZE OF CANVAS IS NOW")
+            rp.log.debug(frame.winfo_height())
             self.itemFrame.pack_propagate(0) 
             self.frames.append(self.itemFrame)
 
@@ -855,9 +906,14 @@ class PastImgs(Frame, ImageFormat):
             # append to photos list to access later
             self.photos.append((im.save_location, im.thumb_save_loc,
                                im.image_name, im.thumb_name))
-            # insert the thumbnail
+            # insert the thumbnail and make the frame have a minimum w/h so
+            # that the im.title won't slide over to the left and off center
+            # itself
             self.photo = PhotoImage(file = im.thumb_save_loc)
-            self.photoLabel = ttk.Label(self.itemFrame, image = self.photo)
+            self.photoFrame = Frame(self.itemFrame, width = 75, height = 50)
+            self.photoFrame.pack_propagate(0)
+            self.photoLabel = ttk.Label(self.photoFrame, image = self.photo)
+            self.photoFrame.pack(side = "left")
             self.photoLabel.image = self.photo # keep a reference per the docs!
             self.photoLabel.pack(side = "left", padx = 10)
             
@@ -870,8 +926,11 @@ class PastImgs(Frame, ImageFormat):
             if len(im.title) > 120:
                 im.title = im.title[:120] + '...'
 
-            self.title = ttk.Label(self.txtFrame, text = im.title,
-                               font = Fonts.SM(), wraplength = 325)
+            self.title = ttk.Label(self.txtFrame,
+                                   text = im.title,
+                                   font = Fonts.SM(),
+                                   wraplength = 325,
+                                   justify = 'center')
             self.title.pack(side = "top", padx = 10)
             
             self.botTxtFrame = Frame(self.txtFrame)
@@ -879,18 +938,23 @@ class PastImgs(Frame, ImageFormat):
             self.botTxtFrame.pack_propagate(0)
             
             # link to post
-            self.link = ttk.Label(self.botTxtFrame, text = "Link",
-                              font = Fonts.M_U(),
-                              cursor = Fonts._CURSOR, foreground = Fonts._HYPERLINK)
+            self.link = ttk.Label(self.botTxtFrame,
+                                  text = "Link",
+                                  font = Fonts.M_U(),
+                                  cursor = Fonts._CURSOR,
+                                  foreground = Fonts._HYPERLINK)
             self.link.grid(row = 0, column = 0)#pack(side = "left", anchor = 'center')
+
 # how to remember variable in a for loop: 
 # https://stackoverflow.com/questions/14259072/tkinter-bind-function-with-variable-in-a-loop/14260871#14260871
             self.link.bind("<Button-1>", self.make_link(im))
             
-            # set as wallpaper
-            self.setAs = ttk.Label(self.botTxtFrame, text = "Set as Wallpaper",
-                               font = Fonts.M_U(), cursor = Fonts._CURSOR,
-                               foreground = Fonts._HYPERLINK)
+            # set as wallpaper text
+            self.setAs = ttk.Label(self.botTxtFrame,
+                                   text = "Set as Wallpaper",
+                                   font = Fonts.M_U(),
+                                   cursor = Fonts._CURSOR,
+                                   foreground = Fonts._HYPERLINK)
             self.setAs.grid(row = 0, column = 1)#pack(side = "left", anchor = 'center')
             self.setAs.bind("<Button-1>", self.make_wallpaper(im))
             
@@ -941,7 +1005,7 @@ class PastImgs(Frame, ImageFormat):
         """
             Updates the past images with new ones that
             may have been downloaded. Updates happen
-            every 5 seconds
+            every 1 second
         """
         # get list of all pictures
         pictures = self.findSavedPictures()
@@ -956,12 +1020,13 @@ class PastImgs(Frame, ImageFormat):
                 newPicList.append(picture)
                 self.picList.append(picture)
 
-        if len(newPicList):
+        if newPicList:
             rp.log.debug("New pictures are: %s\n", tuple(newPicList))
         
-            # pass in the frame to pack the new pictures into 
-            self.populate(self.canFrame, newPicList)
+            # pass in the frame to pack the new pictures in to 
+            self.populate(self.canFrame, self.picList)
             self.scroll.destroy()
+            self.scrollFrame.destroy()
             self.setFrame()
             self.setScroll()
 

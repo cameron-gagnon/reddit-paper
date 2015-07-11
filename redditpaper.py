@@ -293,6 +293,7 @@ class PictureList():
         except sqlite3.OperationalError:
             # return empty list so when iterating the fn 
             # has no objects to iterate over
+            log.debug("No images in database to select from currently")
             return image_list 
 
         results = cur.fetchall()
@@ -823,9 +824,9 @@ def Deviant_parse(url, regex):
         dev_html = urllib.request.urlopen(url, cafile = 'cacert.pem')
 
         # direct image download link that must begin with
-        # fc or orig or pree
+        # fc or orig or pre
         if regex[:2] == "fc" or regex[:4] == "orig" or\
-           regex[:3] == "pre":
+           regex[:3] == "pre" or regex[:3] == "img":
         
             return General_parser(url), url
         else:
@@ -1212,8 +1213,8 @@ def Main_photo_controller(r, image_list):
         Config.writeStatusBar("Checking %d of %d images" % (i, posts)) 
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
         log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                  "\n\t\t\t\t\t\t  Link to Img: %s",
-                  im.title, im.id, im.link)
+                  "\n\t\t\t\t\t\t  Link to Img: %s \n\t\t\t\t\t\t Name of Img: %s",
+                  im.title, im.id, im.link, image_name)
         log.debug("is_deviant: %s", is_deviant)
 
         if (not image_name or not url):
