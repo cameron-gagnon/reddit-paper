@@ -17,7 +17,6 @@ from tkinter import ttk
 from PIL import Image
 from praw import errors
 
-os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(os.getcwd(), "cacert.pem")
 
 class Application(Tk):
     width = 525
@@ -51,10 +50,10 @@ class Application(Tk):
         # window used to pack the pages into
         self.window = Frame(root)#bg = "cyan")         
         self.window.pack()
-        self.frames = {}
+        self.pages = {}
         for F in (CurrentImg, PastImgs, Settings, About):
             frame = F(self.window, self)
-            self.frames[F] = frame
+            self.pages[F] = frame
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         # frame to show on startup
@@ -64,21 +63,22 @@ class Application(Tk):
             Input: the page to display
             Output: displays the page selected on button click
         """
-        frame = self.frames[page]
-        self.pastPage = page
+        frame = self.pages[page]
         # sets the focus on the itemFrame when the
         # PastImgs button is clicked so that the
         # list of pictures is scrollable
         if page is PastImgs:
             try: 
-                    frame.itemFrame.focus_set()
+                frame.canvas.focus_set()
+            # Throws attribute error and also a _tkinter.TclError
+            # which isn't a valid keyword for some reason
             except:
                 rp.log.debug("Could not set focus to PastImgs, likely due to "
-                             "itemFrame not being available") 
+                             "itemFrame not being available", exc_info = True) 
                 # all images are likely deleted from
                 # the itemFrame
                 pass
-        
+       
         self.setButtonImages(page)
         frame.tkraise()
    
@@ -135,7 +135,6 @@ class Application(Tk):
     def addIcon(self):
         self.img = PhotoImage(file = 'images/rp_sq.png')
         self.tk.call('wm', 'iconphoto', self._w, self.img)
-
         
 
     def setUpWindow(self):
@@ -188,6 +187,17 @@ class AboutInfo():
 
     def GitHub():
         return AboutInfo._github
+
+####################### Past Images List Class #################################
+class PastImgClass:
+
+    def __init__(self):
+        self.checkbox = False
+        self.image_name = ""
+        self.full_path = ""
+        self.rel_path = ""
+        self.c_path = ""
+        self.p_path = ""
 
 
 ######################## Classes for Messages #################################
@@ -560,7 +570,7 @@ class CurrentImg(Frame, ImageFormat):
             # AttributeError is in case the image returned
             # is incomplete
             except (AttributeError, TypeError):
-                rp.log.debug("Attribute Error in get_past_img", exc_info = True)
+                rp.log.debug("Attribute Error in get_past_img")
 
         else:
             rp.log.debug("No image set as last image in settings.conf")
@@ -575,7 +585,7 @@ class CurrentImg(Frame, ImageFormat):
         # create subframe to pack widgets into, then destroy it
         # later
         self.image_name = im.image_name
-        self.subFrame = Frame(self.frame, width = 525, height = 410)#bg="white")
+        self.subFrame = Frame(self.frame, width = 525, height = 410)
         self.subFrame.pack_propagate(0)
         self.subFrame.pack()
        
@@ -588,24 +598,23 @@ class CurrentImg(Frame, ImageFormat):
         self.linkLabel = ttk.Label(self.subFrame,
                                    text = im.title,
                                    font = font_to_use,
+                                   justify = 'center',
                                    foreground = Fonts._HYPERLINK,
                                    cursor = Fonts._CURSOR,
                                    wraplength = 500)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
-        self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
+        self.linkLabel.bind("<Button-1>", lambda event: self.open_link(im.post))
         
         try:   
             # create image and convert it to thumbnail
             with open(im.save_location, 'rb') as image_file:
                 imThumb = Image.open(image_file)
-                im.thumb_name = self.strip_file_ext(im.image_name)
-                im.thumb_name += "_C"
-                im.thumb_name = self.add_png(im.thumb_name)
-                im.updateSaveLoc(im.thumb_name)
+                im.strip_file_ext()
+                im.updateSaveLoc()
                 imThumb.thumbnail((400, 250), Image.ANTIALIAS)
-                imThumb.save(im.thumb_save_loc, "PNG")
+                imThumb.save(im.thumb_save_loc_C, "PNG")
             # apply photolabel to page to display
-            self.photo = PhotoImage(file = im.thumb_save_loc)
+            self.photo = PhotoImage(file = im.thumb_save_loc_C)
             self.photoLabel = ttk.Label(self.subFrame, image = self.photo)
             self.photoLabel.pack(side = "bottom", expand = True)
         except FileNotFoundError:
@@ -681,15 +690,15 @@ class PastImgs(Frame, ImageFormat):
 
         self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
         self.canvas.pack(side="left")
-        self.setScroll() 
+        self.setScroll()
 
         # POPULATE CANVAS WITH IMAGES!!!!!!!!
         self.picList = self.findSavedPictures()
         # these lists save each checkbox and frame/photo so we can
         # identify them later when they need to be destroyed
-        self.checkBoxes = []
         self.frames = []
-        self.photos = []
+        self.already_deleted = []
+        self.itemFrame = []
         self.populate(self.canFrame, self.picList)
 
         # bottom frame for buttons
@@ -729,8 +738,9 @@ class PastImgs(Frame, ImageFormat):
         # set the scrollbar to be packed on the right side
         self.scrollFrame.pack(side="right", fill="y")
 
-        # bind the picture frame to the 
+        # bind the picture frame to the canvas
         self.picFrame.bind("<Configure>", self.setFrame) 
+        self.setFrame()
 
     def setKeyBinds(self, widget):
     
@@ -750,7 +760,6 @@ class PastImgs(Frame, ImageFormat):
         keyNum = {40 : 1,   # Down arrow key
                   38 : -1}  # Up arrow key
         scrollVal = None
-        print(vars(event))
 
         if event.keycode in keyNum:
             scrollVal = keyNum.get(event.keycode)
@@ -760,7 +769,7 @@ class PastImgs(Frame, ImageFormat):
         self.canvas.yview_scroll(scrollVal, "units")
 
     def setFrame(self, event = None):
-        """ Sets the canvas dimentions and the scroll area """
+        """ Sets the canvas dimensions and the scroll area """
         self.canvas.configure(scrollregion = self.canvas.bbox('all'))
 
     def change_all(self, event):
@@ -769,74 +778,101 @@ class PastImgs(Frame, ImageFormat):
         """
         if self.selVar.get():
             self.selVar.set(True)
-            for box in self.checkBoxes:
-                box.set(True)
+            for box in self.frames:
+                box[0].set(True)
         else:
             self.selVar.set(False)
-            for box in self.checkBoxes:
-                box.set(False)
+            for box in self.frames:
+                box[0].set(False)
 
     def del_sel(self, popup):
         """
             Delete all frames that have their checkbox
             checked.
-            self.photos[i][0] file path to original img
-                              '/path/to/file/jkY32rv.jpg'
-            self.photos[i][1] file path to png thumbnail 
-                              '/path/to/file/jkY32rv_P.png'
-            self.photos[i][2] original img name 'jkY32rv.jpg' 
+            self.frames[i][2]   ## image class
+            self.frames[i][2].save_location
+                                ## file path to original img
+                                '/path/to/file/jkY32rv.jpg'
+            self.frames[i][2].thumb_save_loc_P 
+                                ## file path to _P.png thumbnail 
+                                '/path/to/file/jkY32rv_P.png'
+            self.frames[i][2].thumb_save_loc_C 
+                                ## file path to _C.png thumbnail
+                                '/path/to/file/jkY32rv_C.png'
+            self.frames[i][2].image_name       ## original img name 'jkY32rv.jpg' 
+            self.frames[i][0] ## checkbox var
+            self.frames[i][1] ## frame to destroy
         """
-        for i, box in enumerate(self.checkBoxes):
-            if box.get():
+        # create copy so we don't modify a list as we
+        # loop over it
+        to_check_list = self.frames[:]
+        i = 0
+        for frame in to_check_list:
+            # if the checkbox var is True
+            if frame[0].get() and len(self.picList):
                 # deletes frame from canvas
                 try:
-                    canframe = self.canFrame.winfo_height()
-                    print(canframe)
-                    self.frames[i].destroy()
+                    print("i is: ",i,"frames len: ", len(self.frames), "picList len: ", len(self.picList))
+                    print(self.frames)
+                    print(self.picList)
+                    print("CANFRAME IS: ", self.canFrame.winfo_height())
+                    to_del = self.frames.pop(i)
+                    print("LEN OF FRAME IS NOW: ", len(self.frames))
+                    self.picList.pop(i)
+                    print("LEN OF PICLIST IS NOW: ", len(self.picList))
+                    item = self.itemFrame.pop(i)
+                    # delete visible frame
+                    #to_del[1].des
+                    item.destroy()
                     # reset scrollbar
                     self.scroll.destroy()
                     self.scrollFrame.destroy()
-                    canframe = self.canFrame.winfo_height()
-                    print(canframe)
                     self.setScroll()
 
                 except AttributeError:
                     # occurs when a frame is supposed to be present
                     # but actually isn't
-                    rp.log.debug("Frame isnt present")
-                    pass
-
+                    rp.log.debug("Frame isn't present", exc_info = True)
+                
+                to_del_img = to_del[2]
 
                 try:
-                    rp.log.debug("self.photos[i][0] is: %s" % self.photos[i][0])
-                    rp.log.debug("self.photos[i][1] is: %s" % self.photos[i][1])
-                    rp.log.debug("self.photos[i][2] is: %s" % self.photos[i][2])
-
-                    os.remove(self.photos[i][0])
-                    rp.log.debug("Removed self.photos[i][0]")
-
-                    os.remove(self.photos[i][1]) 
-                    rp.log.debug("Removed self.photos[i][1]")
-
-                    imageC = self.remove_C(self.photos[i][0], self.photos[i][2])
+                    rp.log.debug("to_del P: %s" % to_del_img.thumb_save_loc_P)
+                    rp.log.debug("to_del C: %s" % to_del_img.thumb_save_loc_C)
+                    rp.log.debug("to_del : %s" % to_del_img.save_location)
+                    # delete thumbnail_P
+                    os.remove(to_del_img.thumb_save_loc_P)
+                    rp.log.debug("Removed to_del_P")
+                    # delete original file
+                    os.remove(to_del_img.save_location) 
+                    rp.log.debug("Removed to_del")
                     
+                    # delete database entry
+                    rp.Database.del_img(to_del_img.image_name)
+                    
+                    # add to_del_img.image_name to list so we don't
+                    # add it again
+                    self.already_deleted.append(to_del_img.image_name)
+
                     try:
-                        os.remove(imageC)
-                        rp.log.debug("Removed imageC: %s" % imageC)
+                        os.remove(to_del_img.thumb_save_loc_C)
+                        rp.log.debug("Removed to_del_C: %s" % to_del_img.thumb_save_loc_C)
                     except FileNotFoundError:
                         # image was likely not set as current image, may not
                         # have been correct dimensions
-                        rp.log.debug("It appears that the image %s was never"
-                                     "set as a current image" % imageC)
-                        pass
-                    
-                    rp.Database.del_img(self.photos[i][2])
+                        rp.log.debug("It appears that the image %s was never "
+                                     "set as a current image" % to_del_img.thumb_save_loc_C)
+
 
                 except (OSError, FileNotFoundError):
                     rp.log.debug("File not found when deleting", exc_info = True)
-                    rp.log.debug(self.photos[i])
-                    pass
+                    rp.log.debug(to_del_img.image_name)
+            else:
+                i += 1
 
+        self.setFrame()
+        self.scroll.destroy()
+        self.setScroll()
         self.selVar.set(False)
         # don't forget to destroy the popup!
         popup.destroy()
@@ -866,110 +902,134 @@ class PastImgs(Frame, ImageFormat):
         """
             Fill the frame with more frames of the images
         """
+        rp.log.debug("Len of picList to populate is {}".format(len(picList)))
         for i, im in enumerate(picList):
+            rp.log.debug("I IS FRESH AND IS {}".format(i))
             try:
+                rp.log.debug("IMAGE SAVE LOC IS: {}".format(im.save_location))
                 with open(im.save_location, 'rb') as image_file:
+                    # create and save image thumbnail
+                    # PIL module used to create thumbnail
                     imThumb = Image.open(image_file)
-                    im.thumb_name = self.strip_file_ext(im.image_name)
-                    im.thumb_name += "_P"
-                    im.thumb_name = self.add_png(im.thumb_name)
-                    im.updateSaveLoc(im.thumb_name)
+                    im.strip_file_ext()
+                    im.updateSaveLoc()
                     imThumb.thumbnail((50, 50), Image.ANTIALIAS)
-                    imThumb.save(im.thumb_save_loc, "PNG")
+                    imThumb.save(im.thumb_save_loc_P, "PNG")
+
             except (FileNotFoundError, OSError):
                 # usually a file that is not an actual image, such
-                # as an html document, so we append dummy variables
-                # so that the indexes will align properly with the
-                # variables later
-                #self.checkBoxes.append(BooleanVar())
-                #self.frames.append("Dummy Frame")
-                #self.photos.append("Dummy Var")
+                # as an html document
+                rp.log.debug("ERROR IS:", exc_info = True)
+                rp.log.debug("FILE NOT FOUND, OR OS ERROR, I is {}".format(i))
                 i -= 1
+                rp.log.debug("I SUBTRACTED {}".format(i))
                 continue 
  
             # create frame to hold information for one picture
-            self.itemFrame = Frame(frame, width = 450, height = 50)
-            self.itemFrame.grid(row = i, column = 0)
-            rp.log.debug("SIZE OF CANVAS IS NOW")
-            rp.log.debug(frame.winfo_height())
-            self.itemFrame.pack_propagate(0) 
-            self.frames.append(self.itemFrame)
+            item = Frame(frame, width = 450, height = 50)
+
+            # self.picList has already been appended to before those pictures
+            # that were appended were gridded. Therefore, we subtract the len
+            # of the new images we are adding, since that will give us the 
+            # row of the last image that was added, and then we add our current
+            # index to this so we arrive at the latest unoccupied row
+            len_p_list = len(self.picList)
+            len_list = len(picList)
+            # only change the row if the p_list is a 
+            # different length of len_list
+            if (len_p_list - len_list) != 0:
+                rp.log.debug("I WAS {}".format(i))
+                i += (len_p_list - len_list)
+                rp.log.debug("UPDATING I INDEX to {}".format(i))
+
+            rp.log.debug("I is now {}".format(i))
+            item.grid(row = i, column = 0)
+            #rp.log.debug("LEN of item frame before append: ", len(self.itemFrame))
+            self.itemFrame.append(item)
+            #rp.log.debug("LEN OF ITEM FRAME IN POPULATE: ", len(self.itemFrame))
+            item.pack_propagate(0)
 
             # checkbox to select/deselect the picture
-            self.checkVar = BooleanVar()
-            self.checkBoxes.append(self.checkVar)
-            self.checkVar.set(False)
-            self.check = ttk.Checkbutton(self.itemFrame,
-                                     variable = self.checkBoxes[i])
-            self.check.pack(side = "left", padx = 5)
+            checkVar = BooleanVar(False)
+            check = ttk.Checkbutton(item,
+                                         variable = checkVar)
+            check.pack(side = "left", padx = 5)
            
-            # append to photos list to access later
-            self.photos.append((im.save_location, im.thumb_save_loc,
-                               im.image_name, im.thumb_name))
             # insert the thumbnail and make the frame have a minimum w/h so
-            # that the im.title won't slide over to the left and off center
+            # that the im.title won't slide over to the left and off-center
             # itself
-            self.photo = PhotoImage(file = im.thumb_save_loc)
-            self.photoFrame = Frame(self.itemFrame, width = 75, height = 50)
-            self.photoFrame.pack_propagate(0)
-            self.photoLabel = ttk.Label(self.photoFrame, image = self.photo)
-            self.photoFrame.pack(side = "left")
-            self.photoLabel.image = self.photo # keep a reference per the docs!
-            self.photoLabel.pack(side = "left", padx = 10)
+            photo = PhotoImage(file = im.thumb_save_loc_P)
+            photoFrame = Frame(item, width = 75, height = 50)
+            photoFrame.pack_propagate(0)
+            photoLabel = ttk.Label(photoFrame, image = photo)
+            photoFrame.pack(side = "left")
+            photoLabel.image = photo # keep a reference per the docs!
+            photoLabel.pack(side = "left", padx = 10)
             
             # text frame
-            self.txtFrame = Frame(self.itemFrame)
-            self.txtFrame.pack()
+            txtFrame = Frame(item)
+            txtFrame.pack()
 
             # title label 
             # slice and add ellipsis if title is too long 
-            if len(im.title) > 120:
-                im.title = im.title[:120] + '...'
+            if len(im.title) > 115:
+                im.title = im.title[:115] + '...'
 
-            self.title = ttk.Label(self.txtFrame,
+            title = ttk.Label(txtFrame,
                                    text = im.title,
                                    font = Fonts.SM(),
                                    wraplength = 325,
                                    justify = 'center')
-            self.title.pack(side = "top", padx = 10)
+            title.pack(side = "top", padx = 10)
             
-            self.botTxtFrame = Frame(self.txtFrame)
-            self.botTxtFrame.pack(side = "bottom", anchor = 'center')
-            self.botTxtFrame.pack_propagate(0)
+            botTxtFrame = Frame(txtFrame)
+            botTxtFrame.pack(side = "bottom", anchor = 'center')
+            botTxtFrame.pack_propagate(0)
             
             # link to post
-            self.link = ttk.Label(self.botTxtFrame,
+            link = ttk.Label(botTxtFrame,
                                   text = "Link",
                                   font = Fonts.M_U(),
                                   cursor = Fonts._CURSOR,
                                   foreground = Fonts._HYPERLINK)
-            self.link.grid(row = 0, column = 0)#pack(side = "left", anchor = 'center')
-
-# how to remember variable in a for loop: 
-# https://stackoverflow.com/questions/14259072/tkinter-bind-function-with-variable-in-a-loop/14260871#14260871
-            self.link.bind("<Button-1>", self.make_link(im))
+            link.grid(row = 0, column = 0)
+ 
+            """
+            how to remember variable/function in a for loop:
+                https://stackoverflow.com/questions/14259072/
+                tkinter-bind-function-with-variable-in-a-loop/
+                14260871#14260871
+            """
+            link.bind("<Button-1>", self.make_link(im))
             
             # set as wallpaper text
-            self.setAs = ttk.Label(self.botTxtFrame,
+            setAs = ttk.Label(botTxtFrame,
                                    text = "Set as Wallpaper",
                                    font = Fonts.M_U(),
                                    cursor = Fonts._CURSOR,
                                    foreground = Fonts._HYPERLINK)
-            self.setAs.grid(row = 0, column = 1)#pack(side = "left", anchor = 'center')
-            self.setAs.bind("<Button-1>", self.make_wallpaper(im))
+            setAs.grid(row = 0, column = 1)
+            setAs.bind("<Button-1>", self.make_wallpaper(im))
+
+            # add to the past images frame to display pictures
+            # self.itemFrame is added so we can delete the frame later on
+            self.frames.append((checkVar, self.itemFrame, im))
             
             # for loop over children of itemFrame did not work
             # to set keybinds, so we manually set all keybinds
             # so scrolling is enabled for both mouse and arrow keys
-            self.setKeyBinds(self.itemFrame)
-            self.setKeyBinds(self.setAs)
-            self.setKeyBinds(self.link)
-            self.setKeyBinds(self.botTxtFrame)
-            self.setKeyBinds(self.title)
-            self.setKeyBinds(self.txtFrame)
-            self.setKeyBinds(self.photoLabel)
-            self.setKeyBinds(self.check)
+            self.setKeyBinds(item)
+            self.setKeyBinds(setAs)
+            self.setKeyBinds(link)
+            self.setKeyBinds(botTxtFrame)
+            self.setKeyBinds(title)
+            self.setKeyBinds(txtFrame)
+            self.setKeyBinds(photoLabel)
+            self.setKeyBinds(check)
         
+        self.setFrame()
+        self.scroll.destroy()
+        self.setScroll()
         self.setKeyBinds(self.canvas) 
 
     def make_link(self, im):
@@ -1009,28 +1069,40 @@ class PastImgs(Frame, ImageFormat):
         """
         # get list of all pictures
         pictures = self.findSavedPictures()
-        newPicList = []
+        new_pictures = False
+        new_pics = []
+        # get all image names from database
         image_name_list = [pic.image_name for pic in self.picList]
         # loop through each picture
+
         for picture in pictures:
             # if picture is not already displayed
+            # and if it hasn't been deleted.
             # then it probably wasn't there before...
             # so we add it to the list to be displayed
-            if picture.image_name not in image_name_list:
-                newPicList.append(picture)
+            if (picture.image_name not in image_name_list):# and\
+               #(picture.image_name not in self.already_deleted):
+                new_pictures = True
+                new_pics.append(picture)
                 self.picList.append(picture)
 
-        if newPicList:
-            rp.log.debug("New pictures are: %s\n", tuple(newPicList))
-        
+        if new_pictures:
+            rp.log.debug("NEW PICTURES AREEEEEE")
+            for pic in new_pics:
+                rp.log.debug(pic.image_name)
+            rp.log.debug("ALREADY DELETED {}".format(self.already_deleted))
             # pass in the frame to pack the new pictures in to 
-            self.populate(self.canFrame, self.picList)
+            self.populate(self.canFrame, new_pics)
+            rp.log.debug("Past populate")
+
+            # destroy scrollbar so it doesn't make a new scrollbar each
+            # time we update pastimages
             self.scroll.destroy()
             self.scrollFrame.destroy()
             self.setFrame()
             self.setScroll()
 
-        self.after(1000, lambda: self.updatePastImgs())
+        self.after(30000, lambda: self.updatePastImgs())
 
     def __str__(self):
         return "Past Images"
@@ -1047,8 +1119,7 @@ class Settings(Frame):
     def __init__(self, parent, controller):
         # force settings file to be created, so we have default
         # values the first time we run the GUI
-        # Frames
-        temp = rp.Config.read_config()
+        rp.Config.read_config()
         Frame.__init__(self, parent)
         self.top = Frame(self)
         # subreddit border
@@ -1094,7 +1165,7 @@ class Settings(Frame):
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
-        self.singleB.bind("<Button-1>", lambda e: rp.Single_link(self.singleE.get()))
+        self.singleB.bind("<Button-1>", lambda event: rp.Single_link(self.singleE.get()))
 
         # Buttons
         self.letsGo = ttk.Button(self, text = "Let's Go!")
@@ -1178,7 +1249,7 @@ class Settings(Frame):
         # packs/binds
         # button packs
         self.letsGo.pack(side = "bottom", anchor = "center", pady = (10, 30))
-        self.letsGo.bind("<Button-1>", lambda e: self.get_pics())
+        self.letsGo.bind("<Button-1>", lambda event: self.get_pics())
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
@@ -1410,7 +1481,7 @@ class About(Frame):
         self.authorTxt.pack(side = "left", padx = (60, 0), pady = (5,0))
         self.authorLink.pack(side = "left", pady = (5,0))
         self.authorLink.bind("<Button-1>", 
-                             lambda x: self.open_link(AboutInfo.reddit()))
+                             lambda event: self.open_link(AboutInfo.reddit()))
         self.subAuthorFrame.pack(side = "top")
         # version frame pack within author frame
         self.version.pack(pady = (0,5))
@@ -1422,7 +1493,7 @@ class About(Frame):
         self.donateTxt2.pack(side = "left", pady = (0, 5), anchor = 'center')
         self.donateLink.pack(side = "left", pady = (0, 5))
         self.donateLink.bind("<Button-1>", 
-                             lambda x: self.open_link(AboutInfo.PayPal()))
+                             lambda event: self.open_link(AboutInfo.PayPal()))
         self.donateFrame.pack(side = "top", fill = "x", padx = (10, 15), 
                               pady = (10, 0))
         self.subDonateFrame.pack(side = "top")
@@ -1435,7 +1506,7 @@ class About(Frame):
         self.number4.pack(side = "left", anchor = 'center')
         self.githubLink.pack(side = "left", anchor = 'center')
         self.githubLink.bind("<Button-1>",
-                            lambda x: self.open_link(AboutInfo.GitHub()))
+                            lambda event: self.open_link(AboutInfo.GitHub()))
         self.feedback4.pack(side = "left", anchor = 'center')
         self.githubFrame.pack(side = "top", anchor = 'center', pady = (0, 5))
         self.feedFrame.pack(side = "top", fill = "x", padx = (10, 15),
