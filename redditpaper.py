@@ -269,13 +269,36 @@ class DBImg(BaseImg):
             self.image_name = image_name
             self.save_location = Config.downloadLoc() + self.image_name
         except (sqlite3.OperationalError, TypeError):
-            log.debug("Error occured in making a DBImg()") 
+            log.debug("Error occured in making a DBImg()")
 
-    def setResolution(self):
-        self.resolution = self.width + 'x' + self.height
+    def updateSaveLoc(self):
+        self.thumb_save_loc_C = Config.downloadLoc() + self.thumb_name_C
+        self.thumb_save_loc_P = Config.downloadLoc() + self.thumb_name_P
 
-    def updateSaveLoc(self, image_name):
-        self.thumb_save_loc = Config.downloadLoc() + image_name
+    def strip_file_ext(self):
+        """
+            Used to remove the .jpg or other ending from im.image_name
+            so that we can resave the thumbnail with .png
+        """
+        index = self.image_name.rfind('.')
+        self.thumb_name = self.image_name[:index]
+        self.add_P()
+        self.add_C()
+        self.add_png()
+    
+    def add_P(self):
+        self.thumb_name_P = self.thumb_name + "_P.png"
+    
+    def add_C(self):
+        self.thumb_name_C = self.thumb_name + "_C.png"
+
+    def add_png(self):
+        """
+            Appends the .png to the end of im.image_name to save the
+            thumbnail with .png
+        """
+        self.thumb_name = self.thumb_name + ".png"
+
 
 ########################################################################
 class PictureList():
@@ -368,11 +391,14 @@ class Database():
     # EFFECTS:  removes the image and its associated data from the
     #           database.
     def del_img(image_name):
-        sql, cur = Database.connect_to_DB()
-        log.debug("Deleting %s from database" % image_name)
-        cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
-        sql.commit()
-
+        try:
+            sql, cur = Database.connect_to_DB()
+            log.debug("Deleting %s from database" % image_name)
+            cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
+            sql.commit()
+        except:
+            rp.log("ERROR WHILE DELETING DB OBJECT", exc_info = True)
+            sys.exit(1)
 
 ###########################################################################
 class Config():
@@ -639,7 +665,8 @@ def Config_logging():
     # created, up to 3 files
     fileHandle = logging.handlers.RotatingFileHandler("CrashReport.log",
                                                       maxBytes=5000000,
-                                                      backupCount=3)
+                                                      backupCount=3,
+                                                      encoding = "utf-8")
     fileHandle.setFormatter(formatFile)
     rootLog.addHandler(fileHandle)
     
@@ -753,10 +780,10 @@ def Flickr_parse(url):
         # standard html anyway. (It's located in 'Model Export' towards the
         # bottom of the page)
         img_link = re.findall(r"""
-                              farm      # farm is always in static img url
-                              [^":]*  # characters to not capture
-                              _[o|k|h|b]\.  # _o indicates original img per 
-                                              # flickr standards
+                              farm           # farm is always in static img url
+                              [^":]*         # characters to not capture
+                              _[o|k|h|b]\.   # _o indicates original img per 
+                                             # flickr standards
                               [jpg|png|gif]* # file format is either 
                                              # png, jpg, or gif
                               """, flickr_html, re.VERBOSE)[0]    
@@ -1084,7 +1111,7 @@ def Check_width_height(id):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [id])
     lookup = cur.fetchone()
     
-    log.debug("Lookup from Check_width_height: %s", lookup)
+    log.debug(u"Lookup from Check_width_height: %s", lookup)
     
     try: 
         width = lookup[5]
@@ -1212,9 +1239,9 @@ def Main_photo_controller(r, image_list):
 
         Config.writeStatusBar("Checking %d of %d images" % (i, posts)) 
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
-        log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                  "\n\t\t\t\t\t\t  Link to Img: %s \n\t\t\t\t\t\t Name of Img: %s",
-                  im.title, im.id, im.link, image_name)
+        log.debug(u"Title of post: {0} \n\t\t\t\t\t\t  Id of post: {1}"
+                  u"\n\t\t\t\t\t\t  Link to Img: {2}\n\t\t\t\t\t\t Name of Img: {3}".format(
+                  im.title, im.id, im.link, image_name))
         log.debug("is_deviant: %s", is_deviant)
 
         if (not image_name or not url):
