@@ -8,7 +8,7 @@ executables = [Executable("gui.pyw",
                           shortcutDir = "DesktopFolder",
                           base = ("Win32GUI" if sys.platform == 'win32' else None))]
 included_files = ["./images", "redditpaper.pyw",
-		          "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
+		  "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
                   "cacert.pem",
                   # for the call to redditpaper with subprocess
                   "C:\\Python34\\pythonw.exe"]
@@ -47,6 +47,5 @@ setup(
         author_email = 'cameron.gagnon@gmail.com',
         url = "http://github.com/cameron-gagnon/reddit-paper",
         executables = executables,
-        options = {"build_exe": build_exe_options}#,
-                   #"bdist_msi": bdist_msi_options}
+        options = {"build_exe": build_exe_options}
 )	
