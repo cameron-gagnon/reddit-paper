@@ -45,9 +45,8 @@ from socket import timeout
 from urllib.error import HTTPError,URLError
 from requests.exceptions import ConnectionError
 from collections import OrderedDict
-#sets up global vars
+#sets up global var
 USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
-
 
 # MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
 # FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
@@ -57,41 +56,52 @@ USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
 # that != width/height requirements. This is
 # because in Cycle_wallpaper, it will cycle
 # the list of images from 0 to MAXPOSTS
-image_list = []
+
 
 
 # make sure to have a file in the same directory with your username
 # on the first line, and password on the second
-def main():
-    global cur
-    global sql
+def main(argList = None):
+    image_list = []
     try:
         # preliminary functions
-        Config_logging()
-        args = Parse_cmd_args()
+        try:
+            if log:
+                pass
+        except NameError:
+            # likely occurs when log is not
+            # defined, so we must define it
+            Config_logging()
+
+        args = Parse_cmd_args(argList)
         config = Config.config(args)
         
-        # checks if a single link was entered by the user to download
-        Single_link(SINGLELINK)
-        db = Database()    
-        
+        Database()    
+        sql, cur = Database.connect_to_DB()
+        log.debug("made database connection")
         r = Connected("https://www.reddit.com/.json")
+        
+
         # this is the main function that will download and parse
         # the images
-        Main_photo_controller(r)
-        Cycle_wallpaper()
+
+        Main_photo_controller(r, image_list)
+        Cycle_wallpaper(image_list)
 
         sql.close()
         # this is printed for ease of use when viewing the debug file
         log.debug("################################################"
                   "################################################\n")
         Config.writeStatusBar("")
+    
     except KeyboardInterrupt:
         log.info("CTRL + C entered from command line, exiting...")
         Config.writeStatusBar("")
         sql.close()
         sys.exit(0)
 
+    except:
+        log.debug("Unknown error occured", exc_info = True)
 
 ####################################################################
 ### CLASS IMPLEMNTATIONS
@@ -206,10 +216,14 @@ class SingleImg(Img):
             return False
 
         # gets the pic download information
-        picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
-    
         try:
-            picdl = urllib.request.urlopen(picdl)
+            picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
+        except ValueError:
+            # invalid url loaded in probably
+            return False
+
+        try:
+            picdl = urllib.request.urlopen(picdl, cafile = 'cacert.pem')
         
         except urllib.error.HTTPError:
             log.exception("Could not open the specified picture webpage!!\n",
@@ -259,13 +273,36 @@ class DBImg(BaseImg):
             self.image_name = image_name
             self.save_location = Config.downloadLoc() + self.image_name
         except (sqlite3.OperationalError, TypeError):
-            log.debug("Error occured in making a DBImg()") 
+            log.debug("Error occured in making a DBImg()")
 
-    def setResolution(self):
-        self.resolution = self.width + 'x' + self.height
+    def updateSaveLoc(self):
+        self.thumb_save_loc_C = Config.downloadLoc() + self.thumb_name_C
+        self.thumb_save_loc_P = Config.downloadLoc() + self.thumb_name_P
 
-    def updateSaveLoc(self, image_name):
-        self.thumb_save_loc = Config.downloadLoc() + image_name
+    def strip_file_ext(self):
+        """
+            Used to remove the .jpg or other ending from im.image_name
+            so that we can resave the thumbnail with .png
+        """
+        index = self.image_name.rfind('.')
+        self.thumb_name = self.image_name[:index]
+        self.add_P()
+        self.add_C()
+        self.add_png()
+    
+    def add_P(self):
+        self.thumb_name_P = self.thumb_name + "_P.png"
+    
+    def add_C(self):
+        self.thumb_name_C = self.thumb_name + "_C.png"
+
+    def add_png(self):
+        """
+            Appends the .png to the end of im.image_name to save the
+            thumbnail with .png
+        """
+        self.thumb_name = self.thumb_name + ".png"
+
 
 ########################################################################
 class PictureList():
@@ -281,10 +318,9 @@ class PictureList():
         try:
             cur.execute('SELECT * FROM oldposts')
         except sqlite3.OperationalError:
-#log.debug("First time running program, "
-#          "no table 'oldposts' in DB file")
             # return empty list so when iterating the fn 
             # has no objects to iterate over
+            log.debug("No images in database to select from currently")
             return image_list 
 
         results = cur.fetchall()
@@ -305,10 +341,12 @@ class AboutInfo():
 ########################################################################
 class Database():
 
-    def __init__(self): #Create_DB()
-        global sql
+    def __init__(self):
         global cur
-           
+        global sql
+        """
+            creates the database if it does not exist already
+        """
         log.info("Accessing database for submission ID's")
         sql, cur = Database.connect_to_DB() 
         # create image database
@@ -318,7 +356,6 @@ class Database():
     
         # commit dem changes yo
         sql.commit()
-
 
     # connects to the wallpaper.db which holds the image info
     def connect_to_DB():
@@ -358,11 +395,14 @@ class Database():
     # EFFECTS:  removes the image and its associated data from the
     #           database.
     def del_img(image_name):
-        sql, cur = Database.connect_to_DB()
-        log.debug("Deleting %s from database" % image_name)
-        cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
-        sql.commit()
-
+        try:
+            sql, cur = Database.connect_to_DB()
+            log.debug("Deleting %s from database" % image_name)
+            cur.execute('DELETE FROM oldposts WHERE ImgName = ?', [image_name])
+            sql.commit()
+        except:
+            rp.log("ERROR WHILE DELETING DB OBJECT", exc_info = True)
+            sys.exit(1)
 
 ###########################################################################
 class Config():
@@ -372,13 +412,17 @@ class Config():
 
     dir_ = os.path.expanduser("~") + "\\Pictures\\RedditPaper\\"
     try:
+        # tries to create this directory, if it already exists
+        # then we're good to go
         os.makedirs(dir_)
     except FileExistsError:
         pass
     except:
+        # excepts any other error and creates an image folder
+        # in the directory where the program was downloaded to
         dir_ = os.getcwd() + "\\Downloaded Images\\"
 
-    default_values = {'DOWNLOADLOCATION': dir_,
+    default_values = {'DWNLDLOC': dir_,
                       'MINWIDTH': 1024,
                       'MINHEIGHT': 768,
                       'SUBREDDITS': "futureporn+earthporn+"
@@ -406,7 +450,7 @@ class Config():
         config['Statusbar'] = OrderedDict([('Statusbar Text',
                                             args['STATUSBAR'])])
         config['Save Location'] = OrderedDict([('Directory',
-                                                args['DOWNLOADLOCATION'])])
+                                                args['DWNLDLOC'])])
         config['Options'] = OrderedDict([('Minwidth', args['MINWIDTH']),
                                          ('Minheight', args['MINHEIGHT']),
                                          ('Subreddits', args['SUBREDDITS']),
@@ -435,6 +479,7 @@ class Config():
         with open('settings.conf', 'w') as configfile:
             config.write(configfile)
 
+        log.debug("Set config file")
     
     def convert_NSFW(nsfw):
         log.debug("nsfw in convert is: %s " % nsfw)
@@ -505,7 +550,7 @@ class Config():
         args['NSFW'] = config.getboolean('Adult Content', 'NSFW',
                                          fallback = False)
         dir_ = os.getcwd() + "\\Downloaded Images\\"
-        args['DOWNLOADLOCATION'] = config.get('Save Location', 'Directory',
+        args['DWNLDLOC'] = config.get('Save Location', 'Directory',
                                               fallback = dir_)
         URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + \
                                             args['CATEGORY'] + "/"
@@ -624,7 +669,8 @@ def Config_logging():
     # created, up to 3 files
     fileHandle = logging.handlers.RotatingFileHandler("CrashReport.log",
                                                       maxBytes=5000000,
-                                                      backupCount=3)
+                                                      backupCount=3,
+                                                      encoding = "utf-8")
     fileHandle.setFormatter(formatFile)
     rootLog.addHandler(fileHandle)
     
@@ -649,11 +695,13 @@ def Config_logging():
 #         false if not able to connect, or timesout
 def Connected(url):
     r = praw.Reddit(user_agent = USERAGENT)
+
     try:
         uaurl = urllib.request.Request(url,
                  headers={'User-Agent' : USERAGENT})
         url = urllib.request.urlopen(uaurl,
-                                     timeout = 3)
+                                     timeout = 3,
+                                     cafile = 'cacert.pem')
 
         content = url.read().decode('utf-8')
         json.loads(content)
@@ -696,9 +744,27 @@ def Single_link(link):
 def General_parser(img_link):
     if img_link == []:
         return False
-        
-    remove_index = img_link.rindex('/')                        
-    image_name =  img_link[-(len(img_link) - remove_index - 1):]
+    try:
+        remove_index = img_link.rindex('/')                        
+    except ValueError:
+        # occurs when index is not found
+        log.debug("'/' in img_link is not found", exc_info = True)
+        return False
+
+    image_name =  img_link[remove_index + 1:]
+    
+    # checks for file format ending, and appends .jpg
+    # if none is found
+    if image_name.rfind('.') == -1:
+        image_name = image_name + ".jpg"
+        log.debug("Image name is: {}".format(image_name))
+
+    index = image_name.rfind('.jpg?')
+    if index != -1:
+        # strips off '?1020a0747' from some image names
+        # that have misc. characters after the .jpg
+        image_name = image_name[:index + 4]
+
     return image_name
 
 
@@ -716,7 +782,7 @@ def General_parser(img_link):
 def Flickr_parse(url):
     try:
         # gets the page and reads the hmtl into flickr_html
-        flickr_html = urllib.request.urlopen(url).read()
+        flickr_html = urllib.request.urlopen(url, cafile = 'cacert.pem').read()
         # searches for static flickr url within webpage
         flickr_html = flickr_html.decode('utf-8')
         
@@ -725,10 +791,10 @@ def Flickr_parse(url):
         # standard html anyway. (It's located in 'Model Export' towards the
         # bottom of the page)
         img_link = re.findall(r"""
-                              farm      # farm is always in static img url
-                              [^":]*  # characters to not capture
-                              _[o|k|h|b]\.  # _o indicates original img per 
-                                              # flickr standards
+                              farm           # farm is always in static img url
+                              [^":]*         # characters to not capture
+                              _[o|k|h|b]\.   # _o indicates original img per 
+                                             # flickr standards
                               [jpg|png|gif]* # file format is either 
                                              # png, jpg, or gif
                               """, flickr_html, re.VERBOSE)[0]    
@@ -768,7 +834,7 @@ def Flickr_parse(url):
 def Five00px_parse(url):
     try:
         #refer to Flickr_parse for explanation of this method
-        px_html = urllib.request.urlopen(url)
+        px_html = urllib.request.urlopen(url, cafile = 'cacert.pem')
     
         img_html = BeautifulSoup(px_html)
         
@@ -793,12 +859,12 @@ def Five00px_parse(url):
 def Deviant_parse(url, regex):
     try:
 
-        dev_html = urllib.request.urlopen(url)
+        dev_html = urllib.request.urlopen(url, cafile = 'cacert.pem')
 
         # direct image download link that must begin with
-        # fc or orig or pree
+        # fc or orig or pre
         if regex[:2] == "fc" or regex[:4] == "orig" or\
-           regex[:3] == "pre":
+           regex[:3] == "pre" or regex[:3] == "img":
         
             return General_parser(url), url
         else:
@@ -829,30 +895,12 @@ def Deviant_parse(url, regex):
                          exc_info = True)
         return False, False
 
-
-####################################################################
-# REQUIRES url in imgur formatting
-# MODIFIES url, image_name
-# EFFECTS  Returns the image name from the url. Helper function to
-#          imgur parse function.
-def Imgur_image_format(url):
-    # finds last '/' in url
-    remove = url.rindex('/')
-    # returns only past the last '/'
-    image_name =  url[remove + 1:]
-    
-    if image_name.rfind('.') == -1:
-        image_name = image_name + ".jpg"
-        
-    log.debug("Image name is: %s", image_name)
-    return image_name
-
 ####################################################################
 # REQUIRES url for earlycanvas parsing
 # MODIFIES the link that gets passed as the download link
 # EFFECTS Returns the direct link to download the image
 def Early_canvas_parser(url):
-    html = urllib.request.urlopen(url)
+    html = urllib.request.urlopen(url, cafile = 'cacert.pem')
     html = BeautifulSoup(html)
     div = html.select('.item-image')[0]
     url = div.findChildren()[0].get('src')
@@ -875,12 +923,12 @@ def Imgur_parse(url, regex):
 
     # then check if it's a direct link
     elif regex == "i.imgur.com":
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         return image_name, url
 
     # check if an imgur.com/gallery link
     elif (url.find('/gallery/') != -1):
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         url = "https://i.imgur.com/" + image_name   
         return image_name, url
 
@@ -888,18 +936,18 @@ def Imgur_parse(url, regex):
     elif (url.find('/a/') != -1):
         # have to find new url to download the first image from album
         uaurl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
-        imgur_html = urllib.request.urlopen(uaurl)
+        imgur_html = urllib.request.urlopen(uaurl, cafile = 'cacert.pem')
         soup = BeautifulSoup(imgur_html)
         
         #   | class=image  w/ child <a> | gets href of this <a> child |
         url = soup.select('.image a')[0].get('href')
         url = "https:" + url
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         return image_name, url
 
     # a regular imgur.com domain but no img type in url
     elif regex == "imgur.com":
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         url = "https://i.imgur.com/" + image_name
         return image_name, url
 
@@ -1056,7 +1104,7 @@ def Check_width_height(id):
     cur.execute('SELECT * FROM oldposts WHERE ID=?', [id])
     lookup = cur.fetchone()
     
-    log.debug("Lookup from Check_width_height: %s", lookup)
+    log.debug(u"Lookup from Check_width_height: %s", lookup)
     
     try: 
         width = lookup[5]
@@ -1131,14 +1179,13 @@ def Lookup_width_height(im):
 #EFFECTS  Prints out the download name and location, then saves the
 #         picture to that spot.
 def Download_img(url, im):
-    global image_list
-    
+
     # gets the pic download information and sets the download location
-    picdl = urllib.request.Request(url, headers = { 'User-Agent': USERAGENT})
+    picdl = urllib.request.Request(url, headers = {'User-Agent': USERAGENT})
     log.debug("URL is: %s", url)
     
     try:
-        picdl = urllib.request.urlopen(picdl)
+        picdl = urllib.request.urlopen(picdl, cafile = 'cacert.pem')
 
     except (urllib.error.HTTPError, urllib.error.URLError):
         log.exception("ERROR: occured in Setting up the url!!\n",
@@ -1165,8 +1212,7 @@ def Download_img(url, im):
 #MODIFIES download location, adds new picture to file
 #EFFECTS  Downloads a new picture from the url specified and saves
 #         it to the location specified from Config.downloadLoc().
-def Main_photo_controller(r):
-    global image_list
+def Main_photo_controller(r, image_list):
     global MAXPOSTS
     
     Config.writeStatusBar("Fetching %s posts from specified "
@@ -1176,18 +1222,19 @@ def Main_photo_controller(r):
     log.debug("URL of query is %s", URL)
 
     i = 1        
- 
+    posts = MAXPOSTS
+
     for i, post in enumerate(r.get_content(url=URL,limit = MAXPOSTS),start = 1):
         
         # creates image class which holds necessary data about post
         im = Img(post)
         image_name, url, is_deviant = Title_from_url(im)
 
-        Config.writeStatusBar("Checking %d of %d images" % (i, MAXPOSTS)) 
+        Config.writeStatusBar("Checking %d of %d images" % (i, posts)) 
         log.debug("POST %d @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@", i)
-        log.debug("Title of post: %s \n\t\t\t\t\t\t  Id of post: %s"
-                  "\n\t\t\t\t\t\t  Link to Img: %s",
-                  im.title, im.id, im.link)
+        log.debug(u"Title of post: {0} \n\t\t\t\t\t\t  Id of post: {1}"
+                  u"\n\t\t\t\t\t\t  Link to Img: {2}\n\t\t\t\t\t\t Name of Img: {3}".format(
+                  im.title, im.id, im.link, image_name))
         log.debug("is_deviant: %s", is_deviant)
 
         if (not image_name or not url):
@@ -1257,8 +1304,7 @@ def Main_photo_controller(r):
 #MODIFIES wallpaper background of the computer
 #EFFECTS  Cycles through the wallpapers that are given by the titles
 #         in the image_list list, based on the CYCLETIME
-def Cycle_wallpaper():
-    global image_list
+def Cycle_wallpaper(image_list):
     
     log.debug("NUM OF IMAGES IS: %s", len(image_list))
     Config.writeStatusBar("%d images downloaded" % len(image_list))
@@ -1291,84 +1337,93 @@ def Cycle_wallpaper():
 #MODIFIES some of the global variables declared at top of program
 #EFFECTS  Sets variables to modify output of program and change 
 #         default options to user specified ones.
-def Parse_cmd_args():
+def Parse_cmd_args(args = None):
     global MINWIDTH
     global MINHEIGHT
     global CYCLETIME
     global MAXPOSTS
     global CATEGORY
     global URL
-    global SINGLELINK
     global SUBREDDITS
     global NSFW
-    global DOWNLOADLOCATION
+    global DWNLDLOC
 
     default = Config.read_config()
-    log.debug("Default nsfw is: %s" % default['NSFW'])
+
     parser = argparse.ArgumentParser(description="Downloads"
             " images from user specified subreddits and sets"
             " them as the wallpaper.", prog="redditpaper.py")
-    parser.add_argument("-mw", "--minwidth", type = int,
+
+    parser.add_argument("-mw", "--minwidth",
+                        type = int,
                         help="Minimum width of picture required "
                              "to download",
                         default = default['MINWIDTH'])
-    parser.add_argument("-mh", "--minheight", type = int,
+
+    parser.add_argument("-mh", "--minheight",   
+                        type = int,
                         help="Minimum height of picture required "
                              "to download",
                         default = default['MINHEIGHT'])
-    parser.add_argument("-mp", "--maxposts", type = int,
+
+    parser.add_argument("-mp", "--maxposts",
+                        type = int,
                         help="Amount of images to check and "
                              "download",
                         default = default['MAXPOSTS'])
-    parser.add_argument("-t", "--cycletime", type = float,
+
+    parser.add_argument("-t", "--cycletime",
+                        type = float,
                         help="Amount of time (in minutes) each image "
                              "will be set as wallpaper",
                         default = default['CYCLETIME'])
-    parser.add_argument("-c", "--category", type = str,
+
+    parser.add_argument("-c", "--category",
+                        type = str,
                         choices = ['hot', 'new', 'rising', 'controversial',\
                                    'top'],
                         default = default['CATEGORY'],
                         help="Options: hot, new, rising, top")
-    parser.add_argument("-l", "--link", type = str, default = None,
-                        help="Provide a direct image link to download"
-                             " just the specified link") 
-    parser.add_argument("-s", "--subreddits", type = str,
+
+    parser.add_argument("-s", "--subreddits", 
+                        type = str,
                         help="Enter a list of mostly image subreddits "
                              "pull the top images from those subreddits",
                         default = default['SUBREDDITS'])
-    parser.add_argument("--nsfw", help="--nsfw will filter images "
-                                        "out if they are NSFW")
-    parser.add_argument("-dl", "--downloadLoc", type = str,
+
+    parser.add_argument("--nsfw", 
+                        help="--nsfw will filter images "
+                             "out if they are NSFW",
+                        default = default['NSFW'],
+                        type = int)
+
+    parser.add_argument("-dl", "--downloadLoc",
+                        type = str,
                         help="Set the file location where the pictures "
                              "will be downloaded to. EX. "
                              "C:\\Users\\USERNAME\\pictures\\. Be sure to "
                              "include the last forward/backward slash.",
-                        default = default['DOWNLOADLOCATION'])
+                        default = default['DWNLDLOC'])
+
     args = parser.parse_args()
+    log.debug("parsing command args: %s" % args)
+
     a = {}
-    a['MINWIDTH'] = args.minwidth
-    a['MINHEIGHT'] = args.minheight
-    a['MAXPOSTS'] = args.maxposts
-    a['CYCLETIME'] = args.cycletime
-    a['CATEGORY'] = args.category
-    SINGLELINK = args.link
-    log.debug("SUBREDDIT is %s", args.subreddits)
-    a['SUBREDDITS'] = args.subreddits
-    log.debug("NSFW is %s", args.nsfw)
-    a['NSFW'] = args.nsfw
-    a['DOWNLOADLOCATION'] = args.downloadLoc
-    a['STATUSBAR'] = "" 
-    
     # declare as global so rest of program can see the values
-    MINWIDTH   =  a['MINWIDTH'] 
-    MINHEIGHT  =  a['MINHEIGHT']
-    MAXPOSTS   =  a['MAXPOSTS'] 
-    CYCLETIME  =  a['CYCLETIME']
-    CATEGORY   =  a['CATEGORY'] 
-    SUBREDDITS =  a['SUBREDDITS']
-    NSFW       =  a['NSFW']
-    DOWNLOADLOCATION = a['DOWNLOADLOCATION'] 
+    MINWIDTH    =  a['MINWIDTH']   =  args.minwidth
+    MINHEIGHT   =  a['MINHEIGHT']  =  args.minheight
+    MAXPOSTS    =  a['MAXPOSTS']   =  args.maxposts
+    CYCLETIME   =  a['CYCLETIME']  =  args.cycletime
+    CATEGORY    =  a['CATEGORY']   =  args.category
+    SUBREDDITS  =  a['SUBREDDITS'] =  args.subreddits
+    NSFW        =  a['NSFW']       =  args.nsfw
+    DWNLDLOC    =  a['DWNLDLOC']   =  args.downloadLoc
+    a['STATUSBAR']  =  ""
+    
     URL = "https://www.reddit.com/r/" + SUBREDDITS + "/" + CATEGORY + "/"
+    log.debug("SUBREDDIT is %s", args.subreddits)
+
+    # log.debug("made it past parsing")
     return a
 
 

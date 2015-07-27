@@ -302,7 +302,8 @@ class Message(Toplevel):
         self.grab_release()
         self.destroy()
 
-    def pack_label(self, text, pady = 8, font =  None, anchor = "center"):
+    def pack_label(self, text, pady = 8, font =  None, anchor = "center",
+                   justify = None):
         """
             Packs a label into the popup with the specified text
         """
@@ -313,7 +314,7 @@ class Message(Toplevel):
             
         label = ttk.Label(self.inner_frame, anchor = anchor,
                           text = text, wraplength = 420,
-                          font = font)
+                          font = font, justify = justify)
         label.pack(side = "top", fill = "x", pady = pady)
 
     def pack_button(self, pady = (10, 10)):
@@ -1307,8 +1308,9 @@ class Settings(Frame):
         self.Message.pack_label("For extra help, please refer to the Feedback"
                                 " and Crash Report section on the next tab."
                                 " An FAQ is also available at the"
-                                " subreddit /r/reddit_paper",
-                                anchor = 'w',
+                                " subreddit /r/reddit_paper.",
+                                anchor = 'center',
+                                justify = 'center',
                                 pady = (10, 5))
         self.Message.pack_label("*Picture Resolution* Specifies the minimum"\
                                 " width and height required to add a wallpaper"\
@@ -1438,7 +1440,7 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-        self.argList = "python.exe " + self.argList
+        self.argList = "pythonw.exe " + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         

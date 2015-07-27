@@ -9,6 +9,7 @@ import webbrowser
 import os
 import subprocess
 import time
+import threading
 from tkinter import *
 from tkinter import font
 from tkinter import StringVar
@@ -49,10 +50,10 @@ class Application(Tk):
         # window used to pack the pages into
         self.window = Frame(root)#bg = "cyan")         
         self.window.pack()
-        self.frames = {}
+        self.pages = {}
         for F in (CurrentImg, PastImgs, Settings, About):
             frame = F(self.window, self)
-            self.frames[F] = frame
+            self.pages[F] = frame
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         # frame to show on startup
@@ -62,21 +63,22 @@ class Application(Tk):
             Input: the page to display
             Output: displays the page selected on button click
         """
-        frame = self.frames[page]
-        self.pastPage = page
+        frame = self.pages[page]
         # sets the focus on the itemFrame when the
         # PastImgs button is clicked so that the
         # list of pictures is scrollable
         if page is PastImgs:
             try: 
-                    frame.itemFrame.focus_set()
+                frame.canvas.focus_set()
+            # Throws attribute error and also a _tkinter.TclError
+            # which isn't a valid keyword for some reason
             except:
                 rp.log.debug("Could not set focus to PastImgs, likely due to "
-                             "itemFrame not being available") 
+                             "itemFrame not being available", exc_info = True) 
                 # all images are likely deleted from
                 # the itemFrame
                 pass
-        
+       
         self.setButtonImages(page)
         frame.tkraise()
    
@@ -133,7 +135,6 @@ class Application(Tk):
     def addIcon(self):
         self.img = PhotoImage(file = 'images/rp_sq.png')
         self.tk.call('wm', 'iconphoto', self._w, self.img)
-
         
 
     def setUpWindow(self):
@@ -167,6 +168,8 @@ class AboutInfo():
                   "business=PKYUCH3L9HJZ6&lc=US&item_name=Cameron%20Gagnon"\
                   "&item_number=81140022&currency_code=USD&bn=PP%2dDonations"\
                   "BF%3abtn_donateCC_LG%2egif%3aNonHosted"
+    _github = "https://github.com/cameron-gagnon/reddit-paper"
+    _subreddit = "https://www.reddit.com/r/reddit_paper"
     
     def version():
         return AboutInfo._version
@@ -176,12 +179,80 @@ class AboutInfo():
 
     def reddit():
         return AboutInfo._redditAcct
+    
+    def subreddit():
+        return AboutInfo._subreddit
 
     def PayPal():
         return AboutInfo._payPalAcct
     
     def email():
         return AboutInfo._email
+
+    def GitHub():
+        return AboutInfo._github
+
+
+################################################################################
+class Fonts():
+    _VERDANA = "Verdana"
+    _CURSOR = "hand2"
+    _HYPERLINK = "#0000EE"
+    _XL = 16 
+    _L = 12
+    _M = 10
+    _S = 8
+    _XS = 7
+    _H1 = 25
+
+    def XS():
+        xs = font.Font(family = Fonts._VERDANA, size = Fonts._XS)
+        return xs
+    def XS_U():
+        xs_u = font.Font(family = Fonts._VERDANA, size = Fonts._XS,
+                       underline = True)
+        return xs_u
+
+    def S():
+        s = font.Font(family = Fonts._VERDANA, size = Fonts._S)
+        return s
+    def S_U():
+        s_u = font.Font(family = Fonts._VERDANA, size = Fonts._S,
+                        underline = True)
+        return s_u
+
+    def M():
+        m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
+        return m
+    def M_U():
+        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
+                          underline = True)
+        return med_u
+   
+    def L():
+        l = font.Font(family = Fonts._VERDANA, size = Fonts._L)
+        return l
+    def L_U():
+        l_u = font.Font(family = Fonts._VERDANA, size = Fonts._L,
+                        underline = True)
+        return l_u
+
+    def XL():
+        xl = font.Font(family = Fonts._VERDANA, size = Fonts._XL)
+        return xl
+    def XL_U():
+        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._XL,
+                         underline = True)
+        return xl_u
+
+   
+    def H1():
+        h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
+        return h1
+    def H1_U():
+        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._H1,
+                         underline = True)
+        return h1_u
 
 
 ######################## Classes for Messages #################################
@@ -194,7 +265,12 @@ class Message(Toplevel):
         Toplevel.__init__(self, master)
         #self.popup = Toplevel() 
         self.wm_title(title)
-        self.addIcon()
+        self.addIcon('images/rp_sq.png')
+        self.set_dimensions(master, 400, 400)
+        self.inner_frame = Frame(self, width = 400, height = 400)
+        self.inner_frame.pack()
+
+#        self.pack_button()
         # bit of a hack to ensure that the window has grab_set applied to it 
         # this is because the window may not be there when self.grab_set() is
         # called, so we wait until it happens without an error
@@ -212,14 +288,13 @@ class Message(Toplevel):
         """
         x = master.winfo_rootx()
         y = master.winfo_rooty()
-        x = (Application.width // 2) + x - (w // 2)
+        x = (Application.width // 2) + x - (w // 2) - 10
         y = (Application.height // 2) + y - 405
         # set permanent dimensions of popup
         self.minsize(width = w, height = h)
         self.maxsize(width = w, height = h)
         self.geometry('{}x{}+{}+{}'.format(w, h, x, y))
  
-
     def delete(self):
         """
             Destroys the popup
@@ -227,30 +302,33 @@ class Message(Toplevel):
         self.grab_release()
         self.destroy()
 
-
-    def pack_label(self, text, pady = 10):
+    def pack_label(self, text, pady = 8, font =  None, anchor = "center",
+                   justify = None):
         """
             Packs a label into the popup with the specified text
         """
-        label = ttk.Label(self, anchor = "center",
+        # bit of a hack since Fonts.L() throws an error if present in the
+        # function declaration
+        if not font:
+           font = Fonts.M()
+            
+        label = ttk.Label(self.inner_frame, anchor = anchor,
                           text = text, wraplength = 420,
-                          font = Fonts.L())
+                          font = font, justify = justify)
         label.pack(side = "top", fill = "x", pady = pady)
-
 
     def pack_button(self, pady = (10, 10)):
         """
             Place a button at the bottom of the widget with the text "Okay"
         """
-        b = ttk.Button(self, text = "Okay", command = self.delete)
+        b = ttk.Button(self.inner_frame, text = "Okay", command = self.delete)
         b.pack(side = "bottom", pady = pady)
 
-
-    def addIcon(self):
+    def addIcon(self, file_name):
             """
                 Adds an error icon to the popup box
             """
-            self.img = PhotoImage(file = 'images/error.png')
+            self.img = PhotoImage(file = file_name)
             self.tk.call('wm', 'iconphoto', self._w, self.img)
 
 
@@ -260,46 +338,51 @@ class ErrorMsg(Message):
         popup = Message.__init__(self, master, title) 
         length = 0
         height = 0
+        self.addIcon('images/error.png')
 
         if isinstance(text, list):
             if len(text) == 1:
                 # if string, return length of string
                 length = len(text[0])
                 height = 170
-                rp.log.debug("Length of error string is: %d, "
-                             "and height is: %d" % (length, height))
+                height += length // 60 * 15
+                rp.log.debug("Length of error string is: {}, "
+                             "and height is: {}".format(length, height))
             elif len(text) > 1:
                 # find max length of string in the list of errors
                 length = len(max(text))
                 # length of the list is num of elts in list 
                 # so to get the height, we take this and
                 # multiply it by a constant and add a base amount
-                height = len(text) * 25 + 130 
-                rp.log.debug("Length of  max error string is: %d " 
-                             "and height is %d" % (length, height))
+                height = len(text) * 25 + 130
+                height += length // 60 * 15
+                rp.log.debug("Length of  max error string is: {} " 
+                             "and height is {}".format(length, height))
             else:
                 # no errors in CLArgs
                 pass 
             self.pack_label("Invalid Argument(s):")
+
         
         else:
             # if just a regular string that we want an error message
             length = len(text) 
             height = 125
+            height += len(text) // 60 * 15
             self.pack_label("Invalid Argument(s):")
             self.pack_label(text)
-            self.pack_button()
-            rp.log.debug("Length of error string is: %d, "
-                         "and height is: %d" % (length, height))
- 
-        width = length * 5 + 160 # length * 5 because each char is probably 
-                                 # about 5 px across. + 160 for padding
-        rp.log.debug("Width of ErrorMsg is %d: " % width)
+            rp.log.debug("Length of error string is: {}, "
+                         "and height is: {}".format((length, height)))
+        #length * 5 because each char is probably 
+        # about 5 px across. + 160 for padding
+        width = length * 5 + 160
+        if (length * 5 + 160) > 475:
+            width = 475
+        
+        rp.log.debug("Width of ErrorMsg is {}".format(width))
+        rp.log.debug("Height of ErrorMsg is {}".format(height))
         self.set_dimensions(master, width, height)
-    
-
-    
-
+        self.pack_button()
 
 class InvalidArg(ErrorMsg):
 
@@ -312,12 +395,11 @@ class InvalidArg(ErrorMsg):
 
         if len(text) > 1:
             for string in text:
-                self.pack_label(string, pady = (5,0))
+                self.pack_label(string)
         elif len(text) == 1:
             self.pack_label(text[0])
         else:
             rp.log.debug("No errors in CLArgs")
-        self.pack_button() 
 
 
 class ConfirmMsg(Message):
@@ -341,59 +423,21 @@ class ConfirmMsg(Message):
         B2.pack(side = "left")
 
 
-################################################################################
-class Fonts():
-    _VERDANA = "Verdana"
-    _CURSOR = "hand2"
-    _HYPERLINK = "#0000EE"
-    _XL = 16 
-    _L = 12
-    _M = 10
-    _SM = 7
-    _H1 = 25
+class AutoScrollbar(ttk.Scrollbar):
+    # a scrollbar that hides itself if it's not needed.  only
+    # works if you use the grid geometry manager.
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            # grid_remove is currently missing from Tkinter!
+            self.tk.call("grid", "remove", self)
+        else:
+            self.grid(sticky = 'nsew')
 
-    def SM():
-        sm = font.Font(family = Fonts._VERDANA, size = Fonts._SM)
-        return sm
-    def SM_U():
-        sm_u = font.Font(family = Fonts._VERDANA, size = Fonts._SM,
-                         underline = True)
-        return sm_u
-
-    def M():
-        m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
-        return m
-    def M_U():
-        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
-                         underline = True)
-        return med_u
-
-   
-    def L():
-        l = font.Font(family = Fonts._VERDANA, size = Fonts._L)
-        return l
-    def L_U():
-        l_u = font.Font(family = Fonts._VERDANA, size = Fonts._L,
-                         underline = True)
-        return l_u
-
-
-    def XL():
-        xl = font.Font(family = Fonts._VERDANA, size = Fonts._XL)
-        return xl
-    def XL_U():
-        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._XL,
-                         underline = True)
-        return xl_u
-
-   
-    def H1():
-        h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
-        return h1
-    def H1_U():
-        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._H1,
-                         underline = True)
-        return h1_u
+        Scrollbar.set(self, lo, hi)
+    def pack(self, **kw):
+        raise Exception("cannot use pack with this widget")
+    def place(self, **kw):
+        raise Exception("cannot use place with this widget")
 
 
 class ImageFormat():
@@ -537,7 +581,7 @@ class CurrentImg(Frame, ImageFormat):
             # AttributeError is in case the image returned
             # is incomplete
             except (AttributeError, TypeError):
-                rp.log.debug("Attribute Error in get_past_img", exc_info = True)
+                rp.log.debug("Attribute Error in get_past_img")
 
         else:
             rp.log.debug("No image set as last image in settings.conf")
@@ -552,7 +596,7 @@ class CurrentImg(Frame, ImageFormat):
         # create subframe to pack widgets into, then destroy it
         # later
         self.image_name = im.image_name
-        self.subFrame = Frame(self.frame, width = 525, height = 410)#bg="white")
+        self.subFrame = Frame(self.frame, width = 525, height = 410)
         self.subFrame.pack_propagate(0)
         self.subFrame.pack()
        
@@ -562,24 +606,26 @@ class CurrentImg(Frame, ImageFormat):
             font_to_use = Fonts.M_U()
         
         # create title link
-        self.linkLabel = ttk.Label(self.subFrame, text = im.title,
-                               font = font_to_use, foreground = Fonts._HYPERLINK,
-                               cursor = Fonts._CURSOR, wraplength = 500)
+        self.linkLabel = ttk.Label(self.subFrame,
+                                   text = im.title,
+                                   font = font_to_use,
+                                   justify = 'center',
+                                   foreground = Fonts._HYPERLINK,
+                                   cursor = Fonts._CURSOR,
+                                   wraplength = 500)
         self.linkLabel.pack(pady = (35, 10), padx = 10)
-        self.linkLabel.bind("<Button-1>", lambda x: self.open_link(im.post))
+        self.linkLabel.bind("<Button-1>", lambda event: self.open_link(im.post))
         
         try:   
             # create image and convert it to thumbnail
             with open(im.save_location, 'rb') as image_file:
                 imThumb = Image.open(image_file)
-                im.thumb_name = self.strip_file_ext(im.image_name)
-                im.thumb_name += "_C"
-                im.thumb_name = self.add_png(im.thumb_name)
-                im.updateSaveLoc(im.thumb_name)
+                im.strip_file_ext()
+                im.updateSaveLoc()
                 imThumb.thumbnail((400, 250), Image.ANTIALIAS)
-                imThumb.save(im.thumb_save_loc, "PNG")
+                imThumb.save(im.thumb_save_loc_C, "PNG")
             # apply photolabel to page to display
-            self.photo = PhotoImage(file = im.thumb_save_loc)
+            self.photo = PhotoImage(file = im.thumb_save_loc_C)
             self.photoLabel = ttk.Label(self.subFrame, image = self.photo)
             self.photoLabel.pack(side = "bottom", expand = True)
         except FileNotFoundError:
@@ -644,25 +690,30 @@ class PastImgs(Frame, ImageFormat):
         selectBox.pack(anchor = 'w', pady = (15, 2), padx = (35, 10))
 
         ### begin canvas/frame/picture list
-        self.picFrame = Frame(self, width = 450, height = 300)#bg = "blue",
+        self.picFrame = Frame(self, width = 450, height = 300)
+        
+        self.picFrame.grid_rowconfigure(0, weight = 1)
+        self.picFrame.grid_columnconfigure(0, weight = 1)
         self.picFrame.pack()
+        
         self.canvas = Canvas(self.picFrame, width = 450, height = 300)
         self.canFrame = Frame(self.canvas)
+
         self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
         self.canvas.pack(side="left")
-        self.setScroll() 
+        self.setScroll()
 
         # POPULATE CANVAS WITH IMAGES!!!!!!!!
         self.picList = self.findSavedPictures()
         # these lists save each checkbox and frame/photo so we can
         # identify them later when they need to be destroyed
-        self.checkBoxes = []
         self.frames = []
-        self.photos = []
-        self.populate(self.canFrame, self.picList) 
+        self.already_deleted = []
+        self.itemFrame = []
+        self.populate(self.canFrame, self.picList)
 
         # bottom frame for buttons
-        self.bottomFrame = Frame(self)                          #bg = 'yellow')
+        self.bottomFrame = Frame(self)
         self.delete = ttk.Button(self.bottomFrame, text = "Delete selected", 
                                state = "normal",
                                command = lambda: ConfirmMsg(self))
@@ -677,10 +728,40 @@ class PastImgs(Frame, ImageFormat):
         self.updatePastImgs()
 
     def setScroll(self):
-        self.scroll = ttk.Scrollbar(self.picFrame, orient = "vertical", command = self.canvas.yview)
+        # create frame to hold scrollbar so we can
+        # use grid on the scrollbar
+        try:
+            self.scrollFrame.destroy()
+        except:
+            # no scrollbar yet created
+            pass
+
+        self.scrollFrame = Frame(self.picFrame)
+
+        # set rows and column configures so we can
+        # make scrollbar take up entire row/column
+        self.scrollFrame.rowconfigure(1, weight = 1)
+        self.scrollFrame.columnconfigure(1, weight = 1)
+        self.scroll = AutoScrollbar(self.scrollFrame,
+                                    orient = "vertical",
+                                    command = self.canvas.yview)
+
+        # set scrollbar as callback to the canvas
         self.canvas.configure(yscrollcommand = self.scroll.set)
-        self.scroll.pack(side="right", fill="y")
+
+        # set the scrollbar to be the height of the canvas
+        self.scroll.grid(sticky = 'ns', row = 1, column = 0)
+
+        # set the scrollbar to be packed on the right side
+        self.scrollFrame.pack(side="right", fill="y")
+
+        # bind the picture frame to the canvas
         self.picFrame.bind("<Configure>", self.setFrame) 
+        self.setFrame()
+
+    def setFrame(self, event = None):
+        """ Sets the canvas dimensions and the scroll area """
+        self.canvas.configure(scrollregion = self.canvas.bbox('all'))
 
     def setKeyBinds(self, widget):
     
@@ -700,7 +781,6 @@ class PastImgs(Frame, ImageFormat):
         keyNum = {40 : 1,   # Down arrow key
                   38 : -1}  # Up arrow key
         scrollVal = None
-        print(vars(event))
 
         if event.keycode in keyNum:
             scrollVal = keyNum.get(event.keycode)
@@ -709,58 +789,109 @@ class PastImgs(Frame, ImageFormat):
 
         self.canvas.yview_scroll(scrollVal, "units")
 
-    def setFrame(self, event = None):
-        """ Sets the canvas dimentions and the scroll area """
-        self.canvas.configure(scrollregion = self.canvas.bbox('all'),
-                              width = 450, height = 300)
-
     def change_all(self, event):
         """
-            selects all the pictures (to be deleted)
+            selects/deselects all the pictures (to be deleted)
         """
         if self.selVar.get():
             self.selVar.set(True)
-            for box in self.checkBoxes:
-                box.set(True)
+            for box in self.frames:
+                box[0].set(True)
         else:
             self.selVar.set(False)
-            for box in self.checkBoxes:
-                box.set(False)
+            for box in self.frames:
+                box[0].set(False)
 
     def del_sel(self, popup):
         """
             Delete all frames that have their checkbox
             checked.
-            self.photos[i][0] file path to original img
-                              '/path/to/file/jkY32rv.jpg'
-            self.photos[i][1] file path to png thumbnail 
-                              '/path/to/file/jkY32rv_P.png'
-            self.photos[i][2] original img name 'jkY32rv.jpg' 
+            self.frames[i][2]   ## image class
+            self.frames[i][2].save_location
+                                ## file path to original img
+                                '/path/to/file/jkY32rv.jpg'
+            self.frames[i][2].thumb_save_loc_P 
+                                ## file path to _P.png thumbnail 
+                                '/path/to/file/jkY32rv_P.png'
+            self.frames[i][2].thumb_save_loc_C 
+                                ## file path to _C.png thumbnail
+                                '/path/to/file/jkY32rv_C.png'
+            self.frames[i][2].image_name       ## original img name 'jkY32rv.jpg' 
+            self.frames[i][0] ## checkbox var
+            self.frames[i][1] ## frame to destroy
         """
-        for i, box in enumerate(self.checkBoxes):
-            if box.get():
+        # create copy so we don't modify a list as we
+        # loop over it
+        to_check_list = self.frames[:]
+        i = 0
+        for frame in to_check_list:
+            # if the checkbox var is True
+            if frame[0].get() and len(self.picList):
                 # deletes frame from canvas
                 try:
-                    self.frames[i].destroy()
+                    rp.log.debug("i is: {} frames len: {} picList len: {}".format(i, len(self.frames), len(self.picList)))
+                    #print(self.frames)
+                    #print(self.picList)
+                    rp.log.debug("CANFRAME IS: {}".format(self.canFrame.winfo_height()))
+                    to_del = self.frames.pop(i)
+                    rp.log.debug("LEN OF FRAME IS NOW: {}".format(len(self.frames)))
+                    rp.log.debug("Popping: {}".format(self.picList[i].image_name))
+                    self.picList.pop(i)
+                    rp.log.debug("LEN OF PICLIST IS NOW: {}".format(len(self.picList)))
+                    item = self.itemFrame.pop(i)
+                    # delete visible frame
+                    #to_del[1].des
+                    item.destroy()
+                    # reset scrollbar
+                    self.scroll.destroy()
+                    self.scrollFrame.destroy()
+                    self.setScroll()
+
                 except AttributeError:
-                    pass
+                    # occurs when a frame is supposed to be present
+                    # but actually isn't
+                    rp.log.debug("Frame isn't present", exc_info = True)
+                
+                to_del_img = to_del[2]
 
-                canvasHeight = self.canvas.winfo_height()
-                self.canvas.configure(height = canvasHeight - 50,
-                                      scrollregion = self.canvas.bbox('all'))
-                # delete image from computer
                 try:
-                    os.remove(self.photos[i][0])
-                    os.remove(self.photos[i][1]) 
-                    imageC = self.remove_C(self.photos[i][0], self.photos[i][2])
-                    os.remove(imageC)
-                    rp.log.debug("Deleting image: %s AND %s" %
-                                (self.photos[i][0], self.photos[i][0]))
-                    rp.Database.del_img(self.photos[i][2])
-                except OSError:
-                    rp.log.debug("File not found when deleting...")
-                    pass
+                    rp.log.debug("to_del P: %s" % to_del_img.thumb_save_loc_P)
+                    rp.log.debug("to_del C: %s" % to_del_img.thumb_save_loc_C)
+                    rp.log.debug("to_del : %s" % to_del_img.save_location)
+                    # delete thumbnail_P
+                    os.remove(to_del_img.thumb_save_loc_P)
+                    rp.log.debug("Removed to_del_P")
+                    # delete original file
+                    os.remove(to_del_img.save_location) 
+                    rp.log.debug("Removed to_del")
+                    
+                    # delete database entry
+                    rp.Database.del_img(to_del_img.image_name)
+                    
+                    # add to_del_img.image_name to list so we don't
+                    # add it again
+                    self.already_deleted.append(to_del_img.image_name)
 
+                    try:
+                        os.remove(to_del_img.thumb_save_loc_C)
+                        rp.log.debug("Removed to_del_C: %s" % to_del_img.thumb_save_loc_C)
+                    except FileNotFoundError:
+                        # image was likely not set as current image, may not
+                        # have been correct dimensions
+                        rp.log.debug("It appears that the image %s was never "
+                                     "set as a current image" % to_del_img.thumb_save_loc_C)
+
+
+                except (OSError, FileNotFoundError):
+                    rp.log.debug("File not found when deleting", exc_info = True)
+                    rp.log.debug(to_del_img.image_name)
+            else:
+                i += 1
+
+        self.setFrame()
+        self.scroll.destroy()
+        self.setScroll()
+        self.selVar.set(False)
         # don't forget to destroy the popup!
         popup.destroy()
        
@@ -789,94 +920,135 @@ class PastImgs(Frame, ImageFormat):
         """
             Fill the frame with more frames of the images
         """
-        for i, im in enumerate(self.picList):
+        rp.log.debug("Len of picList to populate is {}".format(len(picList)))
+        for i, im in enumerate(picList):
+            rp.log.debug("I IS FRESH AND IS {}".format(i))
             try:
+                rp.log.debug("IMAGE SAVE LOC IS: {}".format(im.save_location))
                 with open(im.save_location, 'rb') as image_file:
+                    # create and save image thumbnail
+                    # PIL module used to create thumbnail
                     imThumb = Image.open(image_file)
-                    im.thumb_name = self.strip_file_ext(im.image_name)
-                    im.thumb_name += "_P"
-                    im.thumb_name = self.add_png(im.thumb_name)
-                    im.updateSaveLoc(im.thumb_name)
+                    im.strip_file_ext()
+                    im.updateSaveLoc()
                     imThumb.thumbnail((50, 50), Image.ANTIALIAS)
-                    imThumb.save(im.thumb_save_loc, "PNG")
+                    imThumb.save(im.thumb_save_loc_P, "PNG")
+
             except (FileNotFoundError, OSError):
                 # usually a file that is not an actual image, such
-                # as an html document, so we append dummy variables
-                # so that the indexes will align properly with the
-                # variables later
-                self.checkBoxes.append(BooleanVar())
-                self.frames.append("Dummy Frame")
-                self.photos.append("Dummy Var")
+                # as an html document
+                rp.log.debug("ERROR IS:", exc_info = True)
+                rp.log.debug("FILE NOT FOUND, OR OS ERROR, I is {}".format(i))
+                i -= 1
+                rp.log.debug("I SUBTRACTED {}".format(i))
                 continue 
  
             # create frame to hold information for one picture
-            self.itemFrame = Frame(frame, width = 450, height = 50)#bg = 'pink')
-            self.itemFrame.grid(row = i, column = 0)
-            self.itemFrame.pack_propagate(0) 
-            self.frames.append(self.itemFrame)
+            item = Frame(frame, width = 450, height = 50)
+
+            # self.picList has already been appended to before those pictures
+            # that were appended were gridded. Therefore, we subtract the len
+            # of the new images we are adding, since that will give us the 
+            # row of the last image that was added, and then we add our current
+            # index to this so we arrive at the latest unoccupied row
+            len_p_list = len(self.picList)
+            len_list = len(picList)
+            # only change the row if the p_list is a 
+            # different length of len_list
+            if (len_p_list - len_list) != 0:
+                rp.log.debug("I WAS {}".format(i))
+                i += (len_p_list - len_list)
+                rp.log.debug("UPDATING I INDEX to {}".format(i))
+
+            rp.log.debug("I is now {}".format(i))
+            item.grid(row = i, column = 0)
+            #rp.log.debug("LEN of item frame before append: ", len(self.itemFrame))
+            self.itemFrame.append(item)
+            #rp.log.debug("LEN OF ITEM FRAME IN POPULATE: ", len(self.itemFrame))
+            item.pack_propagate(0)
 
             # checkbox to select/deselect the picture
-            self.checkVar = BooleanVar()
-            self.checkBoxes.append(self.checkVar)
-            self.checkVar.set(False)
-            self.check = ttk.Checkbutton(self.itemFrame,
-                                     variable = self.checkBoxes[i])
-            self.check.pack(side = "left", padx = 5)
+            checkVar = BooleanVar(False)
+            check = ttk.Checkbutton(item,
+                                         variable = checkVar)
+            check.pack(side = "left", padx = 5)
            
-            # append to photos list to access later
-            self.photos.append((im.save_location, im.thumb_save_loc,
-                               im.image_name, im.thumb_name))
-            # insert the thumbnail
-            self.photo = PhotoImage(file = im.thumb_save_loc)
-            self.photoLabel = ttk.Label(self.itemFrame, image = self.photo)
-            self.photoLabel.image = self.photo # keep a reference per the docs!
-            self.photoLabel.pack(side = "left", padx = 10)
+            # insert the thumbnail and make the frame have a minimum w/h so
+            # that the im.title won't slide over to the left and off-center
+            # itself
+            photo = PhotoImage(file = im.thumb_save_loc_P)
+            photoFrame = Frame(item, width = 75, height = 50)
+            photoFrame.pack_propagate(0)
+            photoLabel = ttk.Label(photoFrame, image = photo)
+            photoFrame.pack(side = "left")
+            photoLabel.image = photo # keep a reference per the docs!
+            photoLabel.pack(side = "left", padx = 10)
             
             # text frame
-            self.txtFrame = Frame(self.itemFrame)
-            self.txtFrame.pack()
+            txtFrame = Frame(item)
+            txtFrame.pack()
 
             # title label 
             # slice and add ellipsis if title is too long 
-            if len(im.title) > 120:
-                im.title = im.title[:120] + '...'
+            font = Fonts.S()
+            if len(im.title) > 115:
+                im.title = im.title[:115] + '...'
+                font = Fonts.XS()
 
-            self.title = ttk.Label(self.txtFrame, text = im.title,
-                               font = Fonts.SM(), wraplength = 325)
-            self.title.pack(side = "top", padx = 10)
+            title = ttk.Label(txtFrame,
+                                   text = im.title,
+                                   font = font,
+                                   wraplength = 325,
+                                   justify = 'center')
+            title.pack(side = "top", padx = 10)
             
-            self.botTxtFrame = Frame(self.txtFrame)
-            self.botTxtFrame.pack(side = "bottom", anchor = 'center')
-            self.botTxtFrame.pack_propagate(0)
+            botTxtFrame = Frame(txtFrame)
+            botTxtFrame.pack(side = "bottom", anchor = 'center')
+            botTxtFrame.pack_propagate(0)
             
             # link to post
-            self.link = ttk.Label(self.botTxtFrame, text = "Link",
-                              font = Fonts.M_U(),
-                              cursor = Fonts._CURSOR, foreground = Fonts._HYPERLINK)
-            self.link.grid(row = 0, column = 0)#pack(side = "left", anchor = 'center')
-# how to remember variable in a for loop: 
-# https://stackoverflow.com/questions/14259072/tkinter-bind-function-with-variable-in-a-loop/14260871#14260871
-            self.link.bind("<Button-1>", self.make_link(im))
+            link = ttk.Label(botTxtFrame,
+                                  text = "Link",
+                                  font = Fonts.M_U(),
+                                  cursor = Fonts._CURSOR,
+                                  foreground = Fonts._HYPERLINK)
+            link.grid(row = 0, column = 0)
+ 
+            """
+            how to remember variable/function in a for loop:
+                https://stackoverflow.com/questions/14259072/
+                tkinter-bind-function-with-variable-in-a-loop/
+                14260871#14260871
+            """
+            link.bind("<Button-1>", self.make_link(im))
             
-            # set as wallpaper
-            self.setAs = ttk.Label(self.botTxtFrame, text = "Set as Wallpaper",
-                               font = Fonts.M_U(), cursor = Fonts._CURSOR,
-                               foreground = Fonts._HYPERLINK)
-            self.setAs.grid(row = 0, column = 1)#pack(side = "left", anchor = 'center')
-            self.setAs.bind("<Button-1>", self.make_wallpaper(im))
+            # set as wallpaper text
+            setAs = ttk.Label(botTxtFrame,
+                                   text = "Set as Wallpaper",
+                                   font = Fonts.M_U(),
+                                   cursor = Fonts._CURSOR,
+                                   foreground = Fonts._HYPERLINK)
+            setAs.grid(row = 0, column = 1)
+            setAs.bind("<Button-1>", self.make_wallpaper(im))
+
+            # add to the past images frame to display pictures
+            # self.itemFrame is added so we can delete the frame later on
+            self.frames.append((checkVar, self.itemFrame, im))
             
             # for loop over children of itemFrame did not work
             # to set keybinds, so we manually set all keybinds
             # so scrolling is enabled for both mouse and arrow keys
-            self.setKeyBinds(self.itemFrame)
-            self.setKeyBinds(self.setAs)
-            self.setKeyBinds(self.link)
-            self.setKeyBinds(self.botTxtFrame)
-            self.setKeyBinds(self.title)
-            self.setKeyBinds(self.txtFrame)
-            self.setKeyBinds(self.photoLabel)
-            self.setKeyBinds(self.check)
-        
+            self.setKeyBinds(item)
+            self.setKeyBinds(setAs)
+            self.setKeyBinds(link)
+            self.setKeyBinds(botTxtFrame)
+            self.setKeyBinds(title)
+            self.setKeyBinds(txtFrame)
+            self.setKeyBinds(photoLabel)
+            self.setKeyBinds(check)
+
+        self.scroll.destroy()
+        self.setScroll()
         self.setKeyBinds(self.canvas) 
 
     def make_link(self, im):
@@ -912,31 +1084,43 @@ class PastImgs(Frame, ImageFormat):
         """
             Updates the past images with new ones that
             may have been downloaded. Updates happen
-            every 5 seconds
+            every 1 second
         """
         # get list of all pictures
         pictures = self.findSavedPictures()
-        newPicList = []
+        new_pictures = False
+        new_pics = []
+        # get all image names from database
         image_name_list = [pic.image_name for pic in self.picList]
         # loop through each picture
+
         for picture in pictures:
             # if picture is not already displayed
-            # then it probably wasn't there before...
+            # and if it hasn't been deleted.
+            # then it probably wasn't there before
             # so we add it to the list to be displayed
-            if picture.image_name not in image_name_list:
-                newPicList.append(picture)
+            if (picture.image_name not in image_name_list):# and\
+               #(picture.image_name not in self.already_deleted):
+                new_pictures = True
+                new_pics.append(picture)
                 self.picList.append(picture)
 
-        if len(newPicList):
-            rp.log.debug("New pictures are: %s\n", tuple(newPicList))
-        
-            # pass in the frame to pack the new pictures into 
-            self.populate(self.canFrame, newPicList)
+        if new_pictures:
+            rp.log.debug("NEW PICTURES AREEEEEE")
+            for pic in new_pics:
+                rp.log.debug(pic.image_name)
+            rp.log.debug("ALREADY DELETED {}".format(self.already_deleted))
+            # pass in the frame to pack the new pictures in to 
+            self.populate(self.canFrame, new_pics)
+            rp.log.debug("Past populate")
+
+            # destroy scrollbar so it doesn't make a new scrollbar each
+            # time we update pastimages
             self.scroll.destroy()
-            self.setFrame()
+            self.scrollFrame.destroy()
             self.setScroll()
 
-        self.after(1000, lambda: self.updatePastImgs())
+        self.after(30000, lambda: self.updatePastImgs())
 
     def __str__(self):
         return "Past Images"
@@ -953,13 +1137,13 @@ class Settings(Frame):
     def __init__(self, parent, controller):
         # force settings file to be created, so we have default
         # values the first time we run the GUI
-        # Frames
-        temp = rp.Config.read_config()
+        rp.Config.read_config()
         Frame.__init__(self, parent)
         self.top = Frame(self)
         # subreddit border
-        self.subredditF = ttk.LabelFrame(self, text = "Subreddits to pull from "\
-                                                     "(whitespace separated)")
+        self.subredditF = ttk.LabelFrame(self,
+                                         text = "Subreddits to pull from "\
+                                                "(separated by a space)")
         # nsfw border
         self.midTop = Frame(self.top)
         self.checksFrame = ttk.LabelFrame(self.midTop, text = "Adult Content")
@@ -1000,10 +1184,12 @@ class Settings(Frame):
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
-        self.singleB.bind("<Button-1>", lambda x: rp.Single_link(self.singleE.get()))
+        self.singleB.bind("<Button-1>", lambda event: rp.Single_link(self.singleE.get()))
 
         # Buttons
-        self.letsGo = ttk.Button(self, text = "Let's Go!")
+        self.buttonFrame = Frame(self)
+        self.letsGo = ttk.Button(self.buttonFrame, text = "Let's Go!")
+        self.help = ttk.Button(self.buttonFrame, text = "Help")
       
         # subreddit entry
         self.subreddits = ttk.Entry(self.subredditF, width = 78)
@@ -1083,23 +1269,27 @@ class Settings(Frame):
         
         # packs/binds
         # button packs
-        self.letsGo.pack(side = "bottom", anchor = "center", pady = (10, 30))
-        self.letsGo.bind("<Button-1>", self.get_pics)
-        self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
+        self.buttonFrame.pack(side = "bottom", pady = (10, 30))
+        self.letsGo.pack(side = "left", padx = (200, 0))
+        self.help.pack(side = "left", padx = (128, 0))
+        self.help.bind("<Button-1>", lambda event: self.help_box(parent))
+        self.letsGo.bind("<Button-1>", lambda event: self.get_pics())
+
+        self.nsfw.pack(side = "left", anchor = "nw", pady = 5,
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
         self.top.pack(side = "top", anchor = "w", pady = (10, 10))
-        self.subredditF.pack(side = "top", anchor = "w",\
+        self.subredditF.pack(side = "top", anchor = "w",
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
                           padx = 15)
         self.singleF.pack(side = "top", anchor = 'w', padx = (15, 10))
-        self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
+        self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),
                              padx = (15, 5))
         self.res.pack(side = "top")
         self.midTop.pack(side = "left", padx = 25) 
         self.checks.pack(side = "top")
-        self.checksFrame.pack(side = "top", anchor = "nw",\
+        self.checksFrame.pack(side = "top", anchor = "nw",
                          padx = 5)
         self.maxLabel.pack(side = "top", pady = 10)
         # cycletime and category frame
@@ -1107,7 +1297,67 @@ class Settings(Frame):
         self.ct.pack(side = "bottom", pady = 5)
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-    
+    def help_box(self, parent):
+        """ 
+            Help box for when a user needs to better understand
+            how the program works
+        """
+        self.Message = Message(parent, "Help")
+        self.Message.set_dimensions(parent, 450, 460)
+        self.Message.pack_button()
+        self.Message.pack_label("For extra help, please refer to the Feedback"
+                                " and Crash Report section on the next tab."
+                                " An FAQ is also available at the"
+                                " subreddit /r/reddit_paper.",
+                                anchor = 'center',
+                                justify = 'center',
+                                pady = (10, 5))
+        self.Message.pack_label("*Picture Resolution* Specifies the minimum"\
+                                " width and height required to add a wallpaper"\
+                                " to the queue.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Adult Content* When the box is checked it will"
+                                " filter out wallpapers that are NSFW.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Section* Specifies what category to pull from"
+                                " on Reddit. Most of the time when browsing Reddit"
+                                " you are browsing hot by default",
+                                font =  Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*# of Posts* The number of posts to search"
+                                " through. If using a single subreddit, the first"
+                                " X number of posts will be searched through. If"
+                                " using a multireddit, a breadth-first-search is"
+                                " performed.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Wallpaper Timer* How long the wallpaper will be"
+                                " set as the background.",
+                                font = Fonts.S(),
+                                anchor = 'w', 
+                                pady = 5)
+        self.Message.pack_label("*Subreddits* Enter subreddits separated by a space."
+                                " More than one subreddit to search through is supported.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Download Location* This is where the pictures will"
+                                " be downloaded to.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Direct Download Link* Enter a full URL to a picture"
+                                " to be set as the wallpaper. This link is most commonly"
+                                " found by right clicking, then 'open image in new tab'",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -1124,7 +1374,9 @@ class Settings(Frame):
         try:
             # convert hours to minutes, then add it to minutes, so we 
             # are only dealing with total minutes in the end
-            totalTime = float(self.ctHourE.get()) * 60 + float(self.ctMinE.get())
+            totalTime = float(self.ctHourE.get()) * 60
+            totalTime += float(self.ctMinE.get())
+            print("TOTAL TIME IS:::: %.2f" % totalTime)
             self.values['-t'] = totalTime
             CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +
                                    float(self.ctMinE.get()) * 60000)
@@ -1145,6 +1397,9 @@ class Settings(Frame):
         subs = values['-s'].replace('+', '')
 
         errors = []
+        # if len(values) != 7:
+        #     errors.append("Please fill in all settings options")
+        #     return errors
         if not str(values['-mw']).isdigit():
             errors.append(values['-mw'])
         if not str(values['-mh']).isdigit():
@@ -1159,8 +1414,7 @@ class Settings(Frame):
 
         return errors
 
-
-    def get_pics(self, event):
+    def get_pics(self):
         """ 
             Makes the call to redditpaper.main() to
             start the wallpaper scraper part of the
@@ -1176,9 +1430,8 @@ class Settings(Frame):
             return
 
         rp.log.debug("No errors in CLArgs") 
-        # check if any values are null/empty
-        # if so, don't add them to the list 
-        self.argList = os.getcwd() + '\\redditpaper.pyw'
+        # create string for list of args
+        self.argList = os.getcwd() + '\\redditpaper.py'
         for k, v in self.args.items():
             rp.log.debug("Key, Value in CLArgs is: "
                          + k + " " + str(v))
@@ -1187,11 +1440,23 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-        self.argList = 'pythonw.exe ' + self.argList
+        self.argList = "pythonw.exe " + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         
-        subprocess.Popen(self.argList.split())
+        # should have all valid arguments at this point
+        try:
+            # threaded fn call to run the rp.main part off of
+#            rpKwargs = {"argList": self.argList}
+#            rpRun = threading.Thread(target = rp.main(self.args),
+#                                     name = "Reddit Paper")
+            #rpRun.start()
+#            rp.main(self.args)
+            subprocess.Popen(self.argList.split())
+        except:
+            # catch all errors from rp.main so we raise them
+            # and they don't get swallowed
+            raise
 
     def __str__(self):
         return "Settings"
@@ -1214,7 +1479,7 @@ class About(Frame):
         self.crashFrame = ttk.LabelFrame(self, text = "Crash Report")
         self.versionFrame = Frame(self.authorFrame)
         self.subAuthorFrame = Frame(self.authorFrame)
-        self.feedFrame = ttk.LabelFrame(self, text = "Feeback")
+        self.feedFrame = ttk.LabelFrame(self, text = "Feedback")
 
         # author
         self.authorTxt = ttk.Label(self.subAuthorFrame,
@@ -1240,8 +1505,7 @@ class About(Frame):
                                font = Fonts.M())
         self.subDonateFrame = Frame(self.donateFrame)
         self.donateTxt2 = ttk.Label(self.subDonateFrame,
-                                text = "to the developer at the following "
-                                       "link,",
+                                text = "to the developer",
                                 font = Fonts.M()) 
         self.donateLink = ttk.Label(self.subDonateFrame, text = "here.",
                                     font = Fonts.M_U(),
@@ -1253,10 +1517,18 @@ class About(Frame):
                                   text = "To provide comments/feedback, please "
                                          "do one of the following: ",
                                   font = Fonts.M())
-        self.feedback1 = ttk.Label(self.feedFrame, 
-                                   text = "1. Go to /r/reddit_paper and create a "
-                                          "new post.",
+        self.subredditFrame = Frame(self.feedFrame)
+        self.feedback1 = ttk.Label(self.subredditFrame, 
+                                   text = "1. Go to",
                                    font = Fonts.M())
+        self.subredditLink = ttk.Label(self.subredditFrame,
+                                       text = "/r/reddit_paper",
+                                       font = Fonts.M_U(),
+                                       cursor = Fonts._CURSOR,
+                                       foreground = Fonts._HYPERLINK)
+        self.feedback12 = ttk.Label(self.subredditFrame,
+                                    text = "and create a new post.",
+                                    font = Fonts.M())
         self.feedback2 = ttk.Label(self.feedFrame,
                                    text = "2. Follow the account "
                                           "link at the top and send me a PM.",
@@ -1264,6 +1536,18 @@ class About(Frame):
         self.feedback3 = ttk.Label(self.feedFrame,
                                    text = "3. Email me directly at "
                                           "cameron.gagnon@gmail.com",
+                                   font = Fonts.M())
+        self.githubFrame = Frame(self.feedFrame)
+        self.number4 = ttk.Label(self.githubFrame,
+                                   text = "4.",
+                                   font = Fonts.M())
+        self.githubLink = ttk.Label(self.githubFrame,
+                                   text = "File a bug/create a pull request",
+                                   font = Fonts.M_U(),
+                                   foreground = Fonts._HYPERLINK,
+                                   cursor = Fonts._CURSOR)
+        self.feedback4 = ttk.Label(self.githubFrame,
+                                   text = "because this code is open source!!",
                                    font = Fonts.M())
 
         # send crashReport
@@ -1289,8 +1573,14 @@ class About(Frame):
         self.authorTxt.pack(side = "left", padx = (60, 0), pady = (5,0))
         self.authorLink.pack(side = "left", pady = (5,0))
         self.authorLink.bind("<Button-1>", 
-                             lambda x: self.open_link(AboutInfo.reddit()))
+                             lambda event: self.open_link(AboutInfo.reddit()))
         self.subAuthorFrame.pack(side = "top")
+        
+        self.subredditLink.bind("<Button-1>",
+                                lambda event: self.open_link(AboutInfo.subreddit()))
+        self.githubLink.bind("<Button-1>",
+                            lambda event: self.open_link(AboutInfo.GitHub()))
+
         # version frame pack within author frame
         self.version.pack(pady = (0,5))
         self.versionFrame.pack(side = "top")
@@ -1301,22 +1591,30 @@ class About(Frame):
         self.donateTxt2.pack(side = "left", pady = (0, 5), anchor = 'center')
         self.donateLink.pack(side = "left", pady = (0, 5))
         self.donateLink.bind("<Button-1>", 
-                             lambda x: self.open_link(AboutInfo.PayPal()))
+                             lambda event: self.open_link(AboutInfo.PayPal()))
         self.donateFrame.pack(side = "top", fill = "x", padx = (10, 15), 
                               pady = (10, 0))
         self.subDonateFrame.pack(side = "top")
+        
         # feedback
         self.feedback.pack(side = "top", anchor = 'center', pady = (5, 0))
-        self.feedback1.pack(side = "top", anchor = 'center')
+        self.subredditFrame.pack(side = "top")
+        self.feedback1.pack(side = "left", anchor = 'center')
+        self.subredditLink.pack(side = "left")
+        self.feedback12.pack(side = "left", anchor = 'center')
         self.feedback2.pack(side = "top", anchor = 'center')
-        self.feedback3.pack(side = "top", anchor = 'center', pady = (0, 5))
-
+        self.feedback3.pack(side = "top", anchor = 'center')
+        self.number4.pack(side = "left", anchor = 'center')
+        self.githubLink.pack(side = "left", anchor = 'center')
+        self.feedback4.pack(side = "left", anchor = 'center')
+        self.githubFrame.pack(side = "top", anchor = 'center', pady = (0, 5))
         self.feedFrame.pack(side = "top", fill = "x", padx = (10, 15),
                             pady = (10, 0))
+
         # crash report pack
         self.report.pack(side = "top", anchor = 'center')
         self.report1.pack(side = "top", anchor = 'center')
-        self.crash_loc.pack(side = "top")
+        self.crash_loc.pack(side = "top", pady = (0, 5))
         self.crashFrame.pack(side = "top", fill = "x", padx = (10, 15), 
                              pady = (10, 0))
         
