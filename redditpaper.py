@@ -216,8 +216,12 @@ class SingleImg(Img):
             return False
 
         # gets the pic download information
-        picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
-    
+        try:
+            picdl = urllib.request.Request(link, headers = {'User-Agent':USERAGENT})
+        except ValueError:
+            # invalid url loaded in probably
+            return False
+
         try:
             picdl = urllib.request.urlopen(picdl, cafile = 'cacert.pem')
         
@@ -746,8 +750,15 @@ def General_parser(img_link):
         # occurs when index is not found
         log.debug("'/' in img_link is not found", exc_info = True)
         return False
-    image_name =  img_link[-(len(img_link) - remove_index - 1):]
+
+    image_name =  img_link[remove_index + 1:]
     
+    # checks for file format ending, and appends .jpg
+    # if none is found
+    if image_name.rfind('.') == -1:
+        image_name = image_name + ".jpg"
+        log.debug("Image name is: {}".format(image_name))
+
     index = image_name.rfind('.jpg?')
     if index != -1:
         # strips off '?1020a0747' from some image names
@@ -884,24 +895,6 @@ def Deviant_parse(url, regex):
                          exc_info = True)
         return False, False
 
-
-####################################################################
-# REQUIRES url in imgur formatting
-# MODIFIES url, image_name
-# EFFECTS  Returns the image name from the url. Helper function to
-#          imgur parse function.
-def Imgur_image_format(url):
-    # finds last '/' in url
-    remove = url.rindex('/')
-    # returns only past the last '/'
-    image_name =  url[remove + 1:]
-    
-    if image_name.rfind('.') == -1:
-        image_name = image_name + ".jpg"
-        
-    log.debug("Image name is: %s", image_name)
-    return image_name
-
 ####################################################################
 # REQUIRES url for earlycanvas parsing
 # MODIFIES the link that gets passed as the download link
@@ -930,12 +923,12 @@ def Imgur_parse(url, regex):
 
     # then check if it's a direct link
     elif regex == "i.imgur.com":
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         return image_name, url
 
     # check if an imgur.com/gallery link
     elif (url.find('/gallery/') != -1):
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         url = "https://i.imgur.com/" + image_name   
         return image_name, url
 
@@ -949,12 +942,12 @@ def Imgur_parse(url, regex):
         #   | class=image  w/ child <a> | gets href of this <a> child |
         url = soup.select('.image a')[0].get('href')
         url = "https:" + url
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         return image_name, url
 
     # a regular imgur.com domain but no img type in url
     elif regex == "imgur.com":
-        image_name = Imgur_image_format(url)
+        image_name = General_parser(url)
         url = "https://i.imgur.com/" + image_name
         return image_name, url
 
