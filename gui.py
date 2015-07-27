@@ -210,7 +210,18 @@ class Message(Toplevel):
         Toplevel.__init__(self, master)
         #self.popup = Toplevel() 
         self.wm_title(title)
-        self.addIcon()
+        self.addIcon('images/rp_sq.png')
+        self.set_dimensions(master, 400, 400)
+        self.pack_button()
+
+        self.inner_frame = Frame(self, width = 400, height = 400)
+        
+        self.canvas = Canvas(self.inner_frame, width = 450, height = 450)
+        self.canFrame = Frame(self.canvas)
+
+        self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
+        self.canvas.pack(side="left")
+
         # bit of a hack to ensure that the window has grab_set applied to it 
         # this is because the window may not be there when self.grab_set() is
         # called, so we wait until it happens without an error
@@ -228,14 +239,13 @@ class Message(Toplevel):
         """
         x = master.winfo_rootx()
         y = master.winfo_rooty()
-        x = (Application.width // 2) + x - (w // 2)
+        x = (Application.width // 2) + x - (w // 2) - 10
         y = (Application.height // 2) + y - 405
         # set permanent dimensions of popup
         self.minsize(width = w, height = h)
         self.maxsize(width = w, height = h)
         self.geometry('{}x{}+{}+{}'.format(w, h, x, y))
  
-
     def delete(self):
         """
             Destroys the popup
@@ -243,16 +253,14 @@ class Message(Toplevel):
         self.grab_release()
         self.destroy()
 
-
-    def pack_label(self, text, pady = 10):
+    def pack_label(self, text, pad_y = 10, font_to_use = None):
         """
             Packs a label into the popup with the specified text
         """
-        label = ttk.Label(self, anchor = "center",
+        label = ttk.Label(self.inner_frame, anchor = "center",
                           text = text, wraplength = 420,
-                          font = Fonts.L())
-        label.pack(side = "top", fill = "x", pady = pady)
-
+                          font = Fonts.M())
+        label.pack(side = "top", fill = "x", pady = pad_y)
 
     def pack_button(self, pady = (10, 10)):
         """
@@ -261,12 +269,11 @@ class Message(Toplevel):
         b = ttk.Button(self, text = "Okay", command = self.delete)
         b.pack(side = "bottom", pady = pady)
 
-
-    def addIcon(self):
+    def addIcon(self, file_name):
             """
                 Adds an error icon to the popup box
             """
-            self.img = PhotoImage(file = 'images/error.png')
+            self.img = PhotoImage(file = file_name)
             self.tk.call('wm', 'iconphoto', self._w, self.img)
 
 
@@ -276,6 +283,7 @@ class ErrorMsg(Message):
         popup = Message.__init__(self, master, title) 
         length = 0
         height = 0
+        self.addIcon('images/error.png')
 
         if isinstance(text, list):
             if len(text) == 1:
@@ -304,7 +312,6 @@ class ErrorMsg(Message):
             height = 125
             self.pack_label("Invalid Argument(s):")
             self.pack_label(text)
-            self.pack_button()
             rp.log.debug("Length of error string is: %d, "
                          "and height is: %d" % (length, height))
  
@@ -312,9 +319,6 @@ class ErrorMsg(Message):
                                  # about 5 px across. + 160 for padding
         rp.log.debug("Width of ErrorMsg is %d: " % width)
         self.set_dimensions(master, width, height)
-    
-
-    
 
 
 class InvalidArg(ErrorMsg):
@@ -333,7 +337,6 @@ class InvalidArg(ErrorMsg):
             self.pack_label(text[0])
         else:
             rp.log.debug("No errors in CLArgs")
-        self.pack_button() 
 
 
 class ConfirmMsg(Message):
@@ -719,6 +722,12 @@ class PastImgs(Frame, ImageFormat):
     def setScroll(self):
         # create frame to hold scrollbar so we can
         # use grid on the scrollbar
+        try:
+            self.scrollFrame.destroy()
+        except:
+            # no scrollbar yet created
+            pass
+
         self.scrollFrame = Frame(self.picFrame)
 
         # set rows and column configures so we can
@@ -741,6 +750,10 @@ class PastImgs(Frame, ImageFormat):
         # bind the picture frame to the canvas
         self.picFrame.bind("<Configure>", self.setFrame) 
         self.setFrame()
+
+    def setFrame(self, event = None):
+        """ Sets the canvas dimensions and the scroll area """
+        self.canvas.configure(scrollregion = self.canvas.bbox('all'))
 
     def setKeyBinds(self, widget):
     
@@ -767,10 +780,6 @@ class PastImgs(Frame, ImageFormat):
             scrollVal = int(-1*(event.delta/120))
 
         self.canvas.yview_scroll(scrollVal, "units")
-
-    def setFrame(self, event = None):
-        """ Sets the canvas dimensions and the scroll area """
-        self.canvas.configure(scrollregion = self.canvas.bbox('all'))
 
     def change_all(self, event):
         """
@@ -1026,8 +1035,7 @@ class PastImgs(Frame, ImageFormat):
             self.setKeyBinds(txtFrame)
             self.setKeyBinds(photoLabel)
             self.setKeyBinds(check)
-        
-        self.setFrame()
+
         self.scroll.destroy()
         self.setScroll()
         self.setKeyBinds(self.canvas) 
@@ -1099,7 +1107,6 @@ class PastImgs(Frame, ImageFormat):
             # time we update pastimages
             self.scroll.destroy()
             self.scrollFrame.destroy()
-            self.setFrame()
             self.setScroll()
 
         self.after(30000, lambda: self.updatePastImgs())
@@ -1123,8 +1130,9 @@ class Settings(Frame):
         Frame.__init__(self, parent)
         self.top = Frame(self)
         # subreddit border
-        self.subredditF = ttk.LabelFrame(self, text = "Subreddits to pull from "\
-                                                     "(whitespace separated)")
+        self.subredditF = ttk.LabelFrame(self,
+                                         text = "Subreddits to pull from "\
+                                                "(whitespace separated)")
         # nsfw border
         self.midTop = Frame(self.top)
         self.checksFrame = ttk.LabelFrame(self.midTop, text = "Adult Content")
@@ -1168,7 +1176,9 @@ class Settings(Frame):
         self.singleB.bind("<Button-1>", lambda event: rp.Single_link(self.singleE.get()))
 
         # Buttons
-        self.letsGo = ttk.Button(self, text = "Let's Go!")
+        self.buttonFrame = Frame(self)
+        self.letsGo = ttk.Button(self.buttonFrame, text = "Let's Go!")
+        self.help = ttk.Button(self.buttonFrame, text = "Help")
       
         # subreddit entry
         self.subreddits = ttk.Entry(self.subredditF, width = 78)
@@ -1248,23 +1258,27 @@ class Settings(Frame):
         
         # packs/binds
         # button packs
-        self.letsGo.pack(side = "bottom", anchor = "center", pady = (10, 30))
+        self.buttonFrame.pack(side = "bottom", pady = (10, 30))
+        self.letsGo.pack(side = "left", padx = (200, 0))
+        self.help.pack(side = "left", padx = (128, 0))
+        self.help.bind("<Button-1>", lambda event: self.help_box(parent))
         self.letsGo.bind("<Button-1>", lambda event: self.get_pics())
-        self.nsfw.pack(side = "left", anchor = "nw", pady = 5,\
+
+        self.nsfw.pack(side = "left", anchor = "nw", pady = 5,
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
         self.top.pack(side = "top", anchor = "w", pady = (10, 10))
-        self.subredditF.pack(side = "top", anchor = "w",\
+        self.subredditF.pack(side = "top", anchor = "w",
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
                           padx = 15)
         self.singleF.pack(side = "top", anchor = 'w', padx = (15, 10))
-        self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),\
+        self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),
                              padx = (15, 5))
         self.res.pack(side = "top")
         self.midTop.pack(side = "left", padx = 25) 
         self.checks.pack(side = "top")
-        self.checksFrame.pack(side = "top", anchor = "nw",\
+        self.checksFrame.pack(side = "top", anchor = "nw",
                          padx = 5)
         self.maxLabel.pack(side = "top", pady = 10)
         # cycletime and category frame
@@ -1272,7 +1286,35 @@ class Settings(Frame):
         self.ct.pack(side = "bottom", pady = 5)
         self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
 
-    
+    def help_box(self, parent):
+        """ 
+            Help box for when a user needs to better understand
+            how the program works
+        """
+        self.Message = Message(parent, "Help")
+        self.Message.set_dimensions(parent, 475, 500)
+        self.Message.pack_label("*Picture Resolution* specifies the minimum"\
+                                " width and height required to add a wallpaper"\
+                                " to the queue.", font_to_use = Fonts.M())
+        self.Message.pack_label("*Adult Content* when the box is checked it will"
+                                " filter out wallpapers that are NSFW.",  font_to_use = Fonts.M())
+        self.Message.pack_label("*Section* specifies what category to pull from"
+                                " on Reddit. Most of the time when browsing Reddit"
+                                " you are browsing hot by default", font_to_use =  Fonts.M())
+        self.Message.pack_label("*# of Posts* is the number of posts to search"
+                                " through. If using a single subreddit, the first"
+                                " X number of posts will be searched through. If"
+                                " using a multireddit, a breadth-first-search is"
+                                " performed.",  font_to_use = Fonts.M())
+        self.Message.pack_label("*Wallpaper Timer* is how long the wallpaper will be"
+                                " set as the background.",  font_to_use = Fonts.M())
+        self.Message.pack_label("*Subreddits* Enter subreddits separated by a space"
+                                " more than one subreddit are allowed to be entered.")
+        self.Message.pack_label("*Download Location* This is where the pictures will"
+                                " be downloaded to.",  font_to_use = Fonts.M())
+        self.Message.pack_label("*Direct Download Link* Enter a full URL to a picture"
+                                " to be set as the wallpaper. This link is most commonly"
+                                " found by right clicking -> 'open image in new tab'",  font_to_use = Fonts.M())
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -1420,8 +1462,7 @@ class About(Frame):
                                font = Fonts.M())
         self.subDonateFrame = Frame(self.donateFrame)
         self.donateTxt2 = ttk.Label(self.subDonateFrame,
-                                text = "to the developer at the following "
-                                       "link,",
+                                text = "to the developer",
                                 font = Fonts.M()) 
         self.donateLink = ttk.Label(self.subDonateFrame, text = "here.",
                                     font = Fonts.M_U(),
