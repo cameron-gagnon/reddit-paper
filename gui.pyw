@@ -1431,7 +1431,9 @@ class Settings(Frame):
 
         rp.log.debug("No errors in CLArgs") 
         # create string for list of args
-        self.argList = os.getcwd() + '\\redditpaper.py'
+        self.argList = 'redditpaper.pyw'
+        rp.log.debug(os.getcwd())
+
         for k, v in self.args.items():
             rp.log.debug("Key, Value in CLArgs is: "
                          + k + " " + str(v))
