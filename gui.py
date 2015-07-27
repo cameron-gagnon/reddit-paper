@@ -169,6 +169,7 @@ class AboutInfo():
                   "&item_number=81140022&currency_code=USD&bn=PP%2dDonations"\
                   "BF%3abtn_donateCC_LG%2egif%3aNonHosted"
     _github = "https://github.com/cameron-gagnon/reddit-paper"
+    _subreddit = "https://www.reddit.com/r/reddit_paper"
     
     def version():
         return AboutInfo._version
@@ -178,6 +179,9 @@ class AboutInfo():
 
     def reddit():
         return AboutInfo._redditAcct
+    
+    def subreddit():
+        return AboutInfo._subreddit
 
     def PayPal():
         return AboutInfo._payPalAcct
@@ -188,16 +192,67 @@ class AboutInfo():
     def GitHub():
         return AboutInfo._github
 
-####################### Past Images List Class #################################
-class PastImgClass:
 
-    def __init__(self):
-        self.checkbox = False
-        self.image_name = ""
-        self.full_path = ""
-        self.rel_path = ""
-        self.c_path = ""
-        self.p_path = ""
+################################################################################
+class Fonts():
+    _VERDANA = "Verdana"
+    _CURSOR = "hand2"
+    _HYPERLINK = "#0000EE"
+    _XL = 16 
+    _L = 12
+    _M = 10
+    _S = 8
+    _XS = 7
+    _H1 = 25
+
+    def XS():
+        xs = font.Font(family = Fonts._VERDANA, size = Fonts._XS)
+        return xs
+    def XS_U():
+        xs_u = font.Font(family = Fonts._VERDANA, size = Fonts._XS,
+                       underline = True)
+        return xs_u
+
+    def S():
+        s = font.Font(family = Fonts._VERDANA, size = Fonts._S)
+        return s
+    def S_U():
+        s_u = font.Font(family = Fonts._VERDANA, size = Fonts._S,
+                        underline = True)
+        return s_u
+
+    def M():
+        m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
+        return m
+    def M_U():
+        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
+                          underline = True)
+        return med_u
+   
+    def L():
+        l = font.Font(family = Fonts._VERDANA, size = Fonts._L)
+        return l
+    def L_U():
+        l_u = font.Font(family = Fonts._VERDANA, size = Fonts._L,
+                        underline = True)
+        return l_u
+
+    def XL():
+        xl = font.Font(family = Fonts._VERDANA, size = Fonts._XL)
+        return xl
+    def XL_U():
+        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._XL,
+                         underline = True)
+        return xl_u
+
+   
+    def H1():
+        h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
+        return h1
+    def H1_U():
+        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._H1,
+                         underline = True)
+        return h1_u
 
 
 ######################## Classes for Messages #################################
@@ -212,16 +267,10 @@ class Message(Toplevel):
         self.wm_title(title)
         self.addIcon('images/rp_sq.png')
         self.set_dimensions(master, 400, 400)
-        self.pack_button()
-
         self.inner_frame = Frame(self, width = 400, height = 400)
-        
-        self.canvas = Canvas(self.inner_frame, width = 450, height = 450)
-        self.canFrame = Frame(self.canvas)
+        self.inner_frame.pack()
 
-        self.canvas.create_window((0,0), window = self.canFrame, anchor = 'nw')
-        self.canvas.pack(side="left")
-
+#        self.pack_button()
         # bit of a hack to ensure that the window has grab_set applied to it 
         # this is because the window may not be there when self.grab_set() is
         # called, so we wait until it happens without an error
@@ -253,20 +302,25 @@ class Message(Toplevel):
         self.grab_release()
         self.destroy()
 
-    def pack_label(self, text, pad_y = 10, font_to_use = None):
+    def pack_label(self, text, pady = 8, font =  None, anchor = "center"):
         """
             Packs a label into the popup with the specified text
         """
-        label = ttk.Label(self.inner_frame, anchor = "center",
+        # bit of a hack since Fonts.L() throws an error if present in the
+        # function declaration
+        if not font:
+           font = Fonts.M()
+            
+        label = ttk.Label(self.inner_frame, anchor = anchor,
                           text = text, wraplength = 420,
-                          font = Fonts.M())
-        label.pack(side = "top", fill = "x", pady = pad_y)
+                          font = font)
+        label.pack(side = "top", fill = "x", pady = pady)
 
     def pack_button(self, pady = (10, 10)):
         """
             Place a button at the bottom of the widget with the text "Okay"
         """
-        b = ttk.Button(self, text = "Okay", command = self.delete)
+        b = ttk.Button(self.inner_frame, text = "Okay", command = self.delete)
         b.pack(side = "bottom", pady = pady)
 
     def addIcon(self, file_name):
@@ -290,36 +344,44 @@ class ErrorMsg(Message):
                 # if string, return length of string
                 length = len(text[0])
                 height = 170
-                rp.log.debug("Length of error string is: %d, "
-                             "and height is: %d" % (length, height))
+                height += length // 60 * 15
+                rp.log.debug("Length of error string is: {}, "
+                             "and height is: {}".format(length, height))
             elif len(text) > 1:
                 # find max length of string in the list of errors
                 length = len(max(text))
                 # length of the list is num of elts in list 
                 # so to get the height, we take this and
                 # multiply it by a constant and add a base amount
-                height = len(text) * 25 + 130 
-                rp.log.debug("Length of  max error string is: %d " 
-                             "and height is %d" % (length, height))
+                height = len(text) * 25 + 130
+                height += length // 60 * 15
+                rp.log.debug("Length of  max error string is: {} " 
+                             "and height is {}".format(length, height))
             else:
                 # no errors in CLArgs
                 pass 
             self.pack_label("Invalid Argument(s):")
+
         
         else:
             # if just a regular string that we want an error message
             length = len(text) 
             height = 125
+            height += len(text) // 60 * 15
             self.pack_label("Invalid Argument(s):")
             self.pack_label(text)
-            rp.log.debug("Length of error string is: %d, "
-                         "and height is: %d" % (length, height))
- 
-        width = length * 5 + 160 # length * 5 because each char is probably 
-                                 # about 5 px across. + 160 for padding
-        rp.log.debug("Width of ErrorMsg is %d: " % width)
+            rp.log.debug("Length of error string is: {}, "
+                         "and height is: {}".format((length, height)))
+        #length * 5 because each char is probably 
+        # about 5 px across. + 160 for padding
+        width = length * 5 + 160
+        if (length * 5 + 160) > 475:
+            width = 475
+        
+        rp.log.debug("Width of ErrorMsg is {}".format(width))
+        rp.log.debug("Height of ErrorMsg is {}".format(height))
         self.set_dimensions(master, width, height)
-
+        self.pack_button()
 
 class InvalidArg(ErrorMsg):
 
@@ -332,7 +394,7 @@ class InvalidArg(ErrorMsg):
 
         if len(text) > 1:
             for string in text:
-                self.pack_label(string, pady = (5,0))
+                self.pack_label(string)
         elif len(text) == 1:
             self.pack_label(text[0])
         else:
@@ -375,61 +437,6 @@ class AutoScrollbar(ttk.Scrollbar):
         raise Exception("cannot use pack with this widget")
     def place(self, **kw):
         raise Exception("cannot use place with this widget")
-
-
-################################################################################
-class Fonts():
-    _VERDANA = "Verdana"
-    _CURSOR = "hand2"
-    _HYPERLINK = "#0000EE"
-    _XL = 16 
-    _L = 12
-    _M = 10
-    _SM = 7
-    _H1 = 25
-
-    def SM():
-        sm = font.Font(family = Fonts._VERDANA, size = Fonts._SM)
-        return sm
-    def SM_U():
-        sm_u = font.Font(family = Fonts._VERDANA, size = Fonts._SM,
-                         underline = True)
-        return sm_u
-
-    def M():
-        m = font.Font(family = Fonts._VERDANA, size = Fonts._M)
-        return m
-    def M_U():
-        med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
-                         underline = True)
-        return med_u
-
-   
-    def L():
-        l = font.Font(family = Fonts._VERDANA, size = Fonts._L)
-        return l
-    def L_U():
-        l_u = font.Font(family = Fonts._VERDANA, size = Fonts._L,
-                         underline = True)
-        return l_u
-
-
-    def XL():
-        xl = font.Font(family = Fonts._VERDANA, size = Fonts._XL)
-        return xl
-    def XL_U():
-        xl_u = font.Font(family = Fonts._VERDANA, size = Fonts._XL,
-                         underline = True)
-        return xl_u
-
-   
-    def H1():
-        h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
-        return h1
-    def H1_U():
-        h1_u = font.Font(family = Fonts._VERDANA, size = Fonts._H1,
-                         underline = True)
-        return h1_u
 
 
 class ImageFormat():
@@ -821,14 +828,15 @@ class PastImgs(Frame, ImageFormat):
             if frame[0].get() and len(self.picList):
                 # deletes frame from canvas
                 try:
-                    print("i is: ",i,"frames len: ", len(self.frames), "picList len: ", len(self.picList))
-                    print(self.frames)
-                    print(self.picList)
-                    print("CANFRAME IS: ", self.canFrame.winfo_height())
+                    rp.log.debug("i is: {} frames len: {} picList len: {}".format(i, len(self.frames), len(self.picList)))
+                    #print(self.frames)
+                    #print(self.picList)
+                    rp.log.debug("CANFRAME IS: {}".format(self.canFrame.winfo_height()))
                     to_del = self.frames.pop(i)
-                    print("LEN OF FRAME IS NOW: ", len(self.frames))
+                    rp.log.debug("LEN OF FRAME IS NOW: {}".format(len(self.frames)))
+                    rp.log.debug("Popping: {}".format(self.picList[i].image_name))
                     self.picList.pop(i)
-                    print("LEN OF PICLIST IS NOW: ", len(self.picList))
+                    rp.log.debug("LEN OF PICLIST IS NOW: {}".format(len(self.picList)))
                     item = self.itemFrame.pop(i)
                     # delete visible frame
                     #to_del[1].des
@@ -981,12 +989,14 @@ class PastImgs(Frame, ImageFormat):
 
             # title label 
             # slice and add ellipsis if title is too long 
+            font = Fonts.S()
             if len(im.title) > 115:
                 im.title = im.title[:115] + '...'
+                font = Fonts.XS()
 
             title = ttk.Label(txtFrame,
                                    text = im.title,
-                                   font = Fonts.SM(),
+                                   font = font,
                                    wraplength = 325,
                                    justify = 'center')
             title.pack(side = "top", padx = 10)
@@ -1086,7 +1096,7 @@ class PastImgs(Frame, ImageFormat):
         for picture in pictures:
             # if picture is not already displayed
             # and if it hasn't been deleted.
-            # then it probably wasn't there before...
+            # then it probably wasn't there before
             # so we add it to the list to be displayed
             if (picture.image_name not in image_name_list):# and\
                #(picture.image_name not in self.already_deleted):
@@ -1132,7 +1142,7 @@ class Settings(Frame):
         # subreddit border
         self.subredditF = ttk.LabelFrame(self,
                                          text = "Subreddits to pull from "\
-                                                "(whitespace separated)")
+                                                "(separated by a space)")
         # nsfw border
         self.midTop = Frame(self.top)
         self.checksFrame = ttk.LabelFrame(self.midTop, text = "Adult Content")
@@ -1292,29 +1302,60 @@ class Settings(Frame):
             how the program works
         """
         self.Message = Message(parent, "Help")
-        self.Message.set_dimensions(parent, 475, 500)
-        self.Message.pack_label("*Picture Resolution* specifies the minimum"\
+        self.Message.set_dimensions(parent, 450, 460)
+        self.Message.pack_button()
+        self.Message.pack_label("For extra help, please refer to the Feedback"
+                                " and Crash Report section on the next tab."
+                                " An FAQ is also available at the"
+                                " subreddit /r/reddit_paper",
+                                anchor = 'w',
+                                pady = (10, 5))
+        self.Message.pack_label("*Picture Resolution* Specifies the minimum"\
                                 " width and height required to add a wallpaper"\
-                                " to the queue.", font_to_use = Fonts.M())
-        self.Message.pack_label("*Adult Content* when the box is checked it will"
-                                " filter out wallpapers that are NSFW.",  font_to_use = Fonts.M())
-        self.Message.pack_label("*Section* specifies what category to pull from"
+                                " to the queue.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Adult Content* When the box is checked it will"
+                                " filter out wallpapers that are NSFW.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Section* Specifies what category to pull from"
                                 " on Reddit. Most of the time when browsing Reddit"
-                                " you are browsing hot by default", font_to_use =  Fonts.M())
-        self.Message.pack_label("*# of Posts* is the number of posts to search"
+                                " you are browsing hot by default",
+                                font =  Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*# of Posts* The number of posts to search"
                                 " through. If using a single subreddit, the first"
                                 " X number of posts will be searched through. If"
                                 " using a multireddit, a breadth-first-search is"
-                                " performed.",  font_to_use = Fonts.M())
-        self.Message.pack_label("*Wallpaper Timer* is how long the wallpaper will be"
-                                " set as the background.",  font_to_use = Fonts.M())
-        self.Message.pack_label("*Subreddits* Enter subreddits separated by a space"
-                                " more than one subreddit are allowed to be entered.")
+                                " performed.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
+        self.Message.pack_label("*Wallpaper Timer* How long the wallpaper will be"
+                                " set as the background.",
+                                font = Fonts.S(),
+                                anchor = 'w', 
+                                pady = 5)
+        self.Message.pack_label("*Subreddits* Enter subreddits separated by a space."
+                                " More than one subreddit to search through is supported.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
         self.Message.pack_label("*Download Location* This is where the pictures will"
-                                " be downloaded to.",  font_to_use = Fonts.M())
+                                " be downloaded to.",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
         self.Message.pack_label("*Direct Download Link* Enter a full URL to a picture"
                                 " to be set as the wallpaper. This link is most commonly"
-                                " found by right clicking -> 'open image in new tab'",  font_to_use = Fonts.M())
+                                " found by right clicking, then 'open image in new tab'",
+                                font = Fonts.S(),
+                                anchor = 'w',
+                                pady = 5)
     def get_values(self):
         """ returns the values stored in the entry boxes """
         self.values = {}
@@ -1436,7 +1477,7 @@ class About(Frame):
         self.crashFrame = ttk.LabelFrame(self, text = "Crash Report")
         self.versionFrame = Frame(self.authorFrame)
         self.subAuthorFrame = Frame(self.authorFrame)
-        self.feedFrame = ttk.LabelFrame(self, text = "Feeback")
+        self.feedFrame = ttk.LabelFrame(self, text = "Feedback")
 
         # author
         self.authorTxt = ttk.Label(self.subAuthorFrame,
@@ -1474,10 +1515,18 @@ class About(Frame):
                                   text = "To provide comments/feedback, please "
                                          "do one of the following: ",
                                   font = Fonts.M())
-        self.feedback1 = ttk.Label(self.feedFrame, 
-                                   text = "1. Go to /r/reddit_paper and create a "
-                                          "new post.",
+        self.subredditFrame = Frame(self.feedFrame)
+        self.feedback1 = ttk.Label(self.subredditFrame, 
+                                   text = "1. Go to",
                                    font = Fonts.M())
+        self.subredditLink = ttk.Label(self.subredditFrame,
+                                       text = "/r/reddit_paper",
+                                       font = Fonts.M_U(),
+                                       cursor = Fonts._CURSOR,
+                                       foreground = Fonts._HYPERLINK)
+        self.feedback12 = ttk.Label(self.subredditFrame,
+                                    text = "and create a new post.",
+                                    font = Fonts.M())
         self.feedback2 = ttk.Label(self.feedFrame,
                                    text = "2. Follow the account "
                                           "link at the top and send me a PM.",
@@ -1524,6 +1573,12 @@ class About(Frame):
         self.authorLink.bind("<Button-1>", 
                              lambda event: self.open_link(AboutInfo.reddit()))
         self.subAuthorFrame.pack(side = "top")
+        
+        self.subredditLink.bind("<Button-1>",
+                                lambda event: self.open_link(AboutInfo.subreddit()))
+        self.githubLink.bind("<Button-1>",
+                            lambda event: self.open_link(AboutInfo.GitHub()))
+
         # version frame pack within author frame
         self.version.pack(pady = (0,5))
         self.versionFrame.pack(side = "top")
@@ -1541,13 +1596,14 @@ class About(Frame):
         
         # feedback
         self.feedback.pack(side = "top", anchor = 'center', pady = (5, 0))
-        self.feedback1.pack(side = "top", anchor = 'center')
+        self.subredditFrame.pack(side = "top")
+        self.feedback1.pack(side = "left", anchor = 'center')
+        self.subredditLink.pack(side = "left")
+        self.feedback12.pack(side = "left", anchor = 'center')
         self.feedback2.pack(side = "top", anchor = 'center')
         self.feedback3.pack(side = "top", anchor = 'center')
         self.number4.pack(side = "left", anchor = 'center')
         self.githubLink.pack(side = "left", anchor = 'center')
-        self.githubLink.bind("<Button-1>",
-                            lambda event: self.open_link(AboutInfo.GitHub()))
         self.feedback4.pack(side = "left", anchor = 'center')
         self.githubFrame.pack(side = "top", anchor = 'center', pady = (0, 5))
         self.feedFrame.pack(side = "top", fill = "x", padx = (10, 15),
