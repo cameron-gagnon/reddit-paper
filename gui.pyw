@@ -24,7 +24,7 @@ class Application(Tk):
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
-        
+
         # set title of application on titlebar
         self.wm_title("Reddit Paper")
         
