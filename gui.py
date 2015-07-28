@@ -24,7 +24,7 @@ class Application(Tk):
 
     def __init__(self, master=None):
         Tk.__init__(self, master)
-        
+        print("HELLO FILE LOGGER")
         # set title of application on titlebar
         self.wm_title("Reddit Paper")
         
@@ -1431,7 +1431,9 @@ class Settings(Frame):
 
         rp.log.debug("No errors in CLArgs") 
         # create string for list of args
-        self.argList = os.getcwd() + '\\redditpaper.py'
+        self.argList = 'redditpaper.pyw'
+        rp.log.debug(os.getcwd())
+
         for k, v in self.args.items():
             rp.log.debug("Key, Value in CLArgs is: "
                          + k + " " + str(v))
@@ -1440,7 +1442,7 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-        self.argList = "pythonw.exe " + self.argList
+        self.argList = "python.exe " + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         
