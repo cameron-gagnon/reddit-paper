@@ -1,17 +1,17 @@
 import sys
 from cx_Freeze import setup, Executable
 
-executables = [Executable("gui.pyw",  
+executables = [Executable("gui.py",  
                           icon = "./images/rp_sq_48.ico",
                           targetName = "Reddit Paper.exe",
                           shortcutName = "Reddit Paper",
-                          shortcutDir = "DesktopFolder",
-                          base = ("Win32GUI" if sys.platform == 'win32' else None))]
-included_files = ["./images", "redditpaper.pyw",
+                          shortcutDir = "DesktopFolder")]
+                          #base = ("Win32GUI" if sys.platform == 'win32' else None))]
+included_files = ["./images", "redditpaper.py",
 		              "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
                   "cacert.pem",
                   # for the call to redditpaper with subprocess
-                  "C:\\Python34\\pythonw.exe"]
+                  "C:\\Python34\\python.exe"]
 
 install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter"]
 

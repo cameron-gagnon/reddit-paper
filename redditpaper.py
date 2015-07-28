@@ -649,6 +649,20 @@ class Config():
             with open('settings.conf', 'w+') as configfile:
                 config.write(configfile)
 
+#####################################################################
+# Makes stdout and stderr print to the logging module
+class LoggerWriter:
+    def __init__(self, level):
+        self.level = level
+
+    def write(self, message):
+        # eliminate extra newlines in default sys.stdout
+        if message != '\n':
+            self.level(message)
+
+    def flush(self):
+        self.level(sys.stderr)
+
 ####################################################################
 ### FUNCTION IMPLEMENTATIONS
 ####################################################################
@@ -686,6 +700,8 @@ def Config_logging():
     # add handler to root logger so console && file are written to
     logging.getLogger('').addHandler(console)
     log = logging.getLogger('reddit-paper')
+    sys.stdout = LoggerWriter(log.debug)
+    sys.stderr = LoggerWriter(log.warning)
 
 
 #####################################################################
