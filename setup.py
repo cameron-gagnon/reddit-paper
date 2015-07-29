@@ -14,7 +14,7 @@ included_files = ["./images", "redditpaper.py",
                   # for the call to redditpaper with subprocess
                   "C:\\Python34\\python.exe"]
 
-install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter", "encodings"]
+install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter", "encodings", "codecs"]
 
 build_exe_options = {
         "include_files": included_files,
