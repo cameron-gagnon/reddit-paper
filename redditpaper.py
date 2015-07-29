@@ -38,6 +38,7 @@ import urllib.request
 import subprocess
 import logging
 import logging.handlers
+import encodings
 from detools import wallpaper
 from PIL import Image
 from bs4 import BeautifulSoup
