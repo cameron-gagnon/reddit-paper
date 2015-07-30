@@ -42,6 +42,7 @@ import logging.handlers
 # necessary for cx_freeze #####
 import encodings
 import site
+import abc
 ###############################
 
 from detools import wallpaper
