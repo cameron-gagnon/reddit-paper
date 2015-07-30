@@ -38,7 +38,12 @@ import urllib.request
 import subprocess
 import logging
 import logging.handlers
+
+# necessary for cx_freeze #####
 import encodings
+import site
+###############################
+
 from detools import wallpaper
 from PIL import Image
 from bs4 import BeautifulSoup
