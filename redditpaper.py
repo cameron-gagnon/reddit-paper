@@ -38,12 +38,8 @@ import urllib.request
 import subprocess
 import logging
 import logging.handlers
-
-# necessary for cx_freeze #####
-import encodings
-import site
-import abc
-###############################
+import encodings # cx_freeze
+import abc # cx_freeze
 
 from detools import wallpaper
 from PIL import Image
