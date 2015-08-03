@@ -22,6 +22,7 @@ included_files = ["./images", "redditpaper.py",
                   "C:\\Python34\\Lib\\genericpath.py",
                   "C:\\Python34\\Lib\\_collections_abc.py",
                   "C:\\Python34\\Lib\\_sitebuiltins.py",
+                  "C:\\Python34\\Lib\\sysconfig.py",
                   # for the call to redditpaper with subprocess
                   "C:\\Python34\\python.exe"]
 
