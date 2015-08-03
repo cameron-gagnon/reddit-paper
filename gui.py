@@ -1,4 +1,4 @@
-#! /usr/bin/env python3.4
+#!/usr/bin/env python3.4
 
 import redditpaper as rp
 # must insert config here, so that it
@@ -30,7 +30,7 @@ class Application(Tk):
         
         # set theme
         theme = ttk.Style()
-        theme.theme_use('vista')
+        theme.theme_use('clam')
 
         # set up frame to hold widgets
         root = Frame(self)                              # background="bisque")

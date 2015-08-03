@@ -1,22 +1,24 @@
 import sys
 from cx_Freeze import setup, Executable
 
+#base = ("Win32GUI" if sys.platform == 'win32' else None))]
 executables = [Executable("gui.py",  
                           icon = "./images/rp_sq_48.ico",
                           targetName = "Reddit Paper.exe",
                           shortcutName = "Reddit Paper",
                           shortcutDir = "DesktopFolder")]
-                          #base = ("Win32GUI" if sys.platform == 'win32' else None))]
+                          #base = base)]
+
 included_files = ["./images", "redditpaper.py",
-		              "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
+		  "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
                   "cacert.pem",
-                  #"C:\\Python34\\Lib\\site.py",
-                  #"C:\\Python34\\Lib\\os.py",
-                  #"C:\\Python34\\Lib\\abc.py",
-                  #"C:\\Python34\\Lib\\_weakrefset.py",
-                  #"C:\\Python34\\Lib\\codecs.py",
-                  #"C:\\Python34\\Lib\\encodings",
-                  #"C:\\Python34\\Lib\\io.py",
+                  "C:\\Python34\\Lib\\site.py",
+                  "C:\\Python34\\Lib\\os.py",
+                  "C:\\Python34\\Lib\\abc.py",
+                  "C:\\Python34\\Lib\\_weakrefset.py",
+                  "C:\\Python34\\Lib\\codecs.py",
+                  "C:\\Python34\\Lib\\encodings",
+                  "C:\\Python34\\Lib\\io.py",
                   "C:\\Python34\\Lib\\stat.py",
                   "C:\\Python34\\Lib\\ntpath.py",
                   "C:\\Python34\\Lib\\genericpath.py",
