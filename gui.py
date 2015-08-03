@@ -1162,7 +1162,7 @@ class Settings(Frame):
         self.maxE = ttk.Entry(self.maxFrame, width = 3)
         self.maxE.insert(0, rp.Config.maxposts())
         self.maxE.pack(side = "left", padx = 5, pady = 5)
-        self.maxFrame.pack(padx = 5)
+        self.maxFrame.pack()#padx = 5)
 
         # cycletime border and frame
         self.topRt = Frame(self.top)
@@ -1180,7 +1180,7 @@ class Settings(Frame):
         # Single link border
         self.singleF = ttk.LabelFrame(self, text = "Direct download link  "\
                                         "ex. https://i.imgur.com/rhd1TFF.jpg")
-        self.singleE = ttk.Entry(self.singleF, width = 63)
+        self.singleE = ttk.Entry(self.singleF, width = 33)
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
@@ -1192,14 +1192,14 @@ class Settings(Frame):
         self.help = ttk.Button(self.buttonFrame, text = "Help")
       
         # subreddit entry
-        self.subreddits = ttk.Entry(self.subredditF, width = 78)
+        self.subreddits = ttk.Entry(self.subredditF, width = 48)
         self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = 5,
                              sticky = "w", pady = 5, ipadx = 3)
         # "download to" entry
         self.dlTxt = ttk.Label(self.dlFrame, text = "Download pictures to:") 
         self.dlTxt.grid(row = 0, column = 0, padx = 5, sticky = "w")
-        self.dlLoc = ttk.Entry(self.dlFrame, width = 57)
+        self.dlLoc = ttk.Entry(self.dlFrame, width = 37)
         self.dlLoc.insert(0, rp.Config.downloadLoc())
         self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = 5, pady = 5,
                         ipadx = 1)
@@ -1261,7 +1261,7 @@ class Settings(Frame):
         self.optionVar = rp.Config.category()
         self.catVar.set(self.optionVar)
         self.catDD = ttk.OptionMenu(self.catFrame, self.catVar, self.optionVar, *self.choices)
-        self.catDD.config(width = 14)
+        self.catDD.config(width = 10)
         self.catDD.pack(side = "right", anchor = "e", padx = (0, 5), pady = 5) 
         self.catTxt = ttk.Label(self.catFrame, text = "Category:")
         self.catTxt.pack(side = "left", anchor = "e", padx = (5, 0))
@@ -1271,7 +1271,7 @@ class Settings(Frame):
         # button packs
         self.buttonFrame.pack(side = "bottom", pady = (10, 30))
         self.letsGo.pack(side = "left", padx = (200, 0))
-        self.help.pack(side = "left", padx = (128, 0))
+        self.help.pack(side = "left", padx = (100, 0))
         self.help.bind("<Button-1>", lambda event: self.help_box(parent))
         self.letsGo.bind("<Button-1>", lambda event: self.get_pics())
 
@@ -1287,7 +1287,7 @@ class Settings(Frame):
         self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),
                              padx = (15, 5))
         self.res.pack(side = "top")
-        self.midTop.pack(side = "left", padx = 25) 
+        self.midTop.pack(side = "left", padx = 10) 
         self.checks.pack(side = "top")
         self.checksFrame.pack(side = "top", anchor = "nw",
                          padx = 5)
