@@ -39,10 +39,6 @@ import subprocess
 import logging
 import logging.handlers
 
-import encodings # cx_freeze
-import abc # cx_freeze
-import stat
-
 from detools import wallpaper
 from PIL import Image
 from bs4 import BeautifulSoup
