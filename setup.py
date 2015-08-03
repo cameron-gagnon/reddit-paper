@@ -18,6 +18,7 @@ included_files = ["./images", "redditpaper.py",
                   #"C:\\Python34\\Lib\\encodings",
                   #"C:\\Python34\\Lib\\io.py",
                   "C:\\Python34\\Lib\\stat.py",
+                  "C:\\Python34\\Lib\\ntpath.py",
                   # for the call to redditpaper with subprocess
                   "C:\\Python34\\python.exe"]
 
