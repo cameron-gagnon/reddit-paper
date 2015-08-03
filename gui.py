@@ -991,8 +991,8 @@ class PastImgs(Frame, ImageFormat):
             # title label 
             # slice and add ellipsis if title is too long 
             font = Fonts.S()
-            if len(im.title) > 115:
-                im.title = im.title[:115] + '...'
+            if len(im.title) > 110:
+                im.title = im.title[:110] + '...'
                 font = Fonts.XS()
 
             title = ttk.Label(txtFrame,
