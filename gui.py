@@ -1171,7 +1171,7 @@ class Settings(Frame):
         
         # category border and frame
         self.cat = ttk.LabelFrame(self.topRt, text = "Section")
-        self.catFrame = Frame(self.cat, width = 185, height = 25)
+        self.catFrame = Frame(self.cat, width = 194, height = 25)
         self.catFrame.pack_propagate(0)
 
         # download location border
@@ -1180,7 +1180,7 @@ class Settings(Frame):
         # Single link border
         self.singleF = ttk.LabelFrame(self, text = "Direct download link  "\
                                         "ex. https://i.imgur.com/rhd1TFF.jpg")
-        self.singleE = ttk.Entry(self.singleF, width = 33)
+        self.singleE = ttk.Entry(self.singleF, width = 44)
         self.singleE.pack(side = "left", pady = 5, padx = 10, anchor = 'w')
         self.singleB = ttk.Button(self.singleF, text = "Get Image")
         self.singleB.pack(side = "right", padx = 5, pady = 5)
@@ -1189,17 +1189,19 @@ class Settings(Frame):
         # Buttons
         self.buttonFrame = Frame(self)
         self.letsGo = ttk.Button(self.buttonFrame, text = "Let's Go!")
-        self.help = ttk.Button(self.buttonFrame, text = "Help")
+        self.help = Button(self.buttonFrame, text = "Help",
+                           bg = "#ff4500") 
+        self.help.bind("<Enter>", lambda e: self.help.configure(bg = "#9494ff"))
       
         # subreddit entry
-        self.subreddits = ttk.Entry(self.subredditF, width = 48)
+        self.subreddits = ttk.Entry(self.subredditF, width = 59)
         self.subreddits.insert(0, rp.Config.subreddits())
         self.subreddits.grid(row = 1, column = 2, columnspan = 2, padx = 5,
                              sticky = "w", pady = 5, ipadx = 3)
         # "download to" entry
         self.dlTxt = ttk.Label(self.dlFrame, text = "Download pictures to:") 
         self.dlTxt.grid(row = 0, column = 0, padx = 5, sticky = "w")
-        self.dlLoc = ttk.Entry(self.dlFrame, width = 37)
+        self.dlLoc = ttk.Entry(self.dlFrame, width = 41)
         self.dlLoc.insert(0, rp.Config.downloadLoc())
         self.dlLoc.grid(row = 0, column = 1, sticky = "w", padx = 5, pady = 5,
                         ipadx = 1)
@@ -1271,7 +1273,7 @@ class Settings(Frame):
         # button packs
         self.buttonFrame.pack(side = "bottom", pady = (10, 30))
         self.letsGo.pack(side = "left", padx = (200, 0))
-        self.help.pack(side = "left", padx = (100, 0))
+        self.help.pack(side = "left", padx = (90, 0))
         self.help.bind("<Button-1>", lambda event: self.help_box(parent))
         self.letsGo.bind("<Button-1>", lambda event: self.get_pics())
 
@@ -1308,7 +1310,7 @@ class Settings(Frame):
         self.Message.pack_label("For extra help, please refer to the Feedback"
                                 " and Crash Report section on the next tab."
                                 " An FAQ is also available at the"
-                                " subreddit /r/reddit_paper.",
+                                " subreddit r/reddit_paper.",
                                 anchor = 'center',
                                 justify = 'center',
                                 pady = (10, 5))
@@ -1448,12 +1450,7 @@ class Settings(Frame):
         
         # should have all valid arguments at this point
         try:
-            # threaded fn call to run the rp.main part off of
-#            rpKwargs = {"argList": self.argList}
-#            rpRun = threading.Thread(target = rp.main(self.args),
-#                                     name = "Reddit Paper")
-            #rpRun.start()
-#            rp.main(self.args)
+            # run program from shell-essentially
             subprocess.Popen(self.argList.split())
         except:
             # catch all errors from rp.main so we raise them
@@ -1524,7 +1521,7 @@ class About(Frame):
                                    text = "1. Go to",
                                    font = Fonts.M())
         self.subredditLink = ttk.Label(self.subredditFrame,
-                                       text = "/r/reddit_paper",
+                                       text = "r/reddit_paper",
                                        font = Fonts.M_U(),
                                        cursor = Fonts._CURSOR,
                                        foreground = Fonts._HYPERLINK)
