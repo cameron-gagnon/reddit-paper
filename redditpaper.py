@@ -52,14 +52,6 @@ USERAGENT = "Reddit wallpaper changer script:v1.0 /u/camerongagnon"
 # MANY DEFAULT VALUES ARE DECLARED GLOBAL IN THE PARSE ARGUMENTS
 # FUNCTION TO SET UP THE VALUES FOR THE RUN OF THE PROGRAM
 
-# declared as global in functions so we can
-# decrement MAXPOSTS when we encounter an img
-# that != width/height requirements. This is
-# because in Cycle_wallpaper, it will cycle
-# the list of images from 0 to MAXPOSTS
-
-
-
 # make sure to have a file in the same directory with your username
 # on the first line, and password on the second
 def main(argList = None):
@@ -411,7 +403,7 @@ class Config():
         Values used to initiate the settings file.
     """
 
-    dir_ = os.path.expanduser("~") + "\\Pictures\\RedditPaper\\"
+    dir_ = os.path.expanduser("~") + "/Pictures/RedditPaper/"
     try:
         # tries to create this directory, if it already exists
         # then we're good to go
@@ -421,7 +413,7 @@ class Config():
     except:
         # excepts any other error and creates an image folder
         # in the directory where the program was downloaded to
-        dir_ = os.getcwd() + "\\Downloaded Images\\"
+        dir_ = os.getcwd() + "/Downloaded Images/"
 
     default_values = {'DWNLDLOC': dir_,
                       'MINWIDTH': 1024,
@@ -550,7 +542,7 @@ class Config():
         args['CATEGORY'] = config.get('Options', 'Category', fallback = "hot")
         args['NSFW'] = config.getboolean('Adult Content', 'NSFW',
                                          fallback = False)
-        dir_ = os.getcwd() + "\\Downloaded Images\\"
+        dir_ = os.getcwd() + "/Downloaded Images/"
         args['DWNLDLOC'] = config.get('Save Location', 'Directory',
                                               fallback = dir_)
         URL = "https://www.reddit.com/r/" + args['SUBREDDITS'] + "/" + \
@@ -1418,8 +1410,8 @@ def Parse_cmd_args(args = None):
                         type = str,
                         help="Set the file location where the pictures "
                              "will be downloaded to. EX. "
-                             "C:\\Users\\USERNAME\\pictures\\. Be sure to "
-                             "include the last forward/backward slash.",
+                             "~/Pictures/. Be sure to "
+                             "include the last forward slash.",
                         default = default['DWNLDLOC'])
 
     args = parser.parse_args()

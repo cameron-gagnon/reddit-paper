@@ -1,39 +1,39 @@
 import sys
 from cx_Freeze import setup, Executable
 
-#base = ("Win32GUI" if sys.platform == 'win32' else None))]
-executables = [Executable("gui.py",  
-                          icon = "./images/rp_sq_48.ico",
-                          targetName = "Reddit Paper.exe",
-                          shortcutName = "Reddit Paper",
-                          shortcutDir = "DesktopFolder")]
-                          #base = base)]
+#base = ("Win32GUI" if sys.platform == 'win32' else None)
+executables = [Executable("gui.py"  
+                          #icon = "./images/rp_sq_48.ico",
+                          #targetName = "Reddit Paper.deb",
+                          #shortcutName = "Reddit Paper",
+                          #shortcutDir = "DesktopFolder",
+                          )]
 
 included_files = ["./images", "redditpaper.py",
-		  "C:\\Python34\\Lib\\site-packages\\praw\\praw.ini",
+		  "/usr/local/lib/python3.4/dist-packages/praw/praw.ini",
                   "cacert.pem",
-                  "C:\\Python34\\Lib\\site.py",
-                  "C:\\Python34\\Lib\\os.py",
-                  "C:\\Python34\\Lib\\abc.py",
-                  "C:\\Python34\\Lib\\_weakrefset.py",
-                  "C:\\Python34\\Lib\\codecs.py",
-                  "C:\\Python34\\Lib\\encodings",
-                  "C:\\Python34\\Lib\\io.py",
-                  "C:\\Python34\\Lib\\stat.py",
-                  "C:\\Python34\\Lib\\ntpath.py",
-                  "C:\\Python34\\Lib\\genericpath.py",
-                  "C:\\Python34\\Lib\\_collections_abc.py",
-                  "C:\\Python34\\Lib\\_sitebuiltins.py",
-                  "C:\\Python34\\Lib\\sysconfig.py",
+                  #"C:\\Python34\\Lib\\site.py",
+                  #"C:\\Python34\\Lib\\os.py",
+                  #"C:\\Python34\\Lib\\abc.py",
+                  #"C:\\Python34\\Lib\\_weakrefset.py",
+                  #"C:\\Python34\\Lib\\codecs.py",
+                  #"C:\\Python34\\Lib\\encodings",
+                  #"C:\\Python34\\Lib\\io.py",
+                  #"C:\\Python34\\Lib\\stat.py",
+                  #"C:\\Python34\\Lib\\ntpath.py",
+                  #"C:\\Python34\\Lib\\genericpath.py",
+                  #"C:\\Python34\\Lib\\_collections_abc.py",
+                  #"C:\\Python34\\Lib\\_sitebuiltins.py",
+                  #"C:\\Python34\\Lib\\sysconfig.py",
                   # for the call to redditpaper with subprocess
-                  "C:\\Python34\\python.exe"]
+                  "/usr/bin/python3.4"]
 
 install_requires = ["praw", "urllib.request", "bs4", "PIL", "sqlite3", "tkinter", "os", "site", "io", "encodings"]
 
 build_exe_options = {
         "include_files": included_files,
-        "packages": install_requires,
-        "include_msvcr": True
+        "packages": install_requires
+#        "include_msvcr": True
 }
 
 shortcut_table = [

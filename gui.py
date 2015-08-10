@@ -417,9 +417,11 @@ class ConfirmMsg(Message):
         self.pack_label("Are you sure?")
         BFrame = Frame(self)
         BFrame.pack()
-        B1 = ttk.Button(BFrame, text = "Yes", command = lambda: master.del_sel(self))
-        B2 = ttk.Button(BFrame, text = "No", command = self.delete)
-        B1.pack(side = "left")
+        B1 = ttk.Button(BFrame, text = "Yes", width = 8, command = lambda: master.del_sel(self))
+        B1.pack_propagate(0)
+        B2 = ttk.Button(BFrame, text = "No", width = 8, command = self.delete)
+        B2.pack_propagate(0)
+        B1.pack(side = "left", padx = (0, 5))
         B2.pack(side = "left")
 
 
@@ -769,7 +771,8 @@ class PastImgs(Frame, ImageFormat):
             Sets the binds to the keys for the canvas movements
             when adding new elts
         """
-        widget.bind("<MouseWheel>", self.onMouseWheel)
+        widget.bind("<Button-4>", self.onMouseWheel)# up scroll
+        widget.bind("<Button-5>", self.onMouseWheel)# down scroll 
         widget.bind("<Up>", self.onMouseWheel)
         widget.bind("<Down>", self.onMouseWheel)
      
@@ -778,14 +781,18 @@ class PastImgs(Frame, ImageFormat):
             Scrolls the canvas up or down depending on the 
             event entered (arrow keys/mouse scroll)
         """
-        keyNum = {40 : 1,   # Down arrow key
-                  38 : -1}  # Up arrow key
+        keyNum = {116 : 1,   # Down arrow key
+                  111 : -1}  # Up arrow key
+        scrollNum = {4 : -1,
+                     5 : 1}
         scrollVal = None
-
+        
+        # up/down arrows
         if event.keycode in keyNum:
             scrollVal = keyNum.get(event.keycode)
-        else:
-            scrollVal = int(-1*(event.delta/120))
+        # scroll wheel events
+        elif event.num in scrollNum:
+            scrollVal = scrollNum.get(event.num) 
 
         self.canvas.yview_scroll(scrollVal, "units")
 
@@ -1158,7 +1165,7 @@ class Settings(Frame):
         self.maxLabel = ttk.LabelFrame(self.midTop, text = "# of Posts")
         self.maxFrame = Frame(self.maxLabel)
         self.maxTxt = ttk.Label(self.maxFrame, text = "Max posts:")
-        self.maxTxt.pack(side = "left", padx = (0, 5))
+        self.maxTxt.pack(side = "left", padx = 5)
         self.maxE = ttk.Entry(self.maxFrame, width = 3)
         self.maxE.insert(0, rp.Config.maxposts())
         self.maxE.pack(side = "left", padx = 5, pady = 5)
@@ -1171,7 +1178,7 @@ class Settings(Frame):
         
         # category border and frame
         self.cat = ttk.LabelFrame(self.topRt, text = "Section")
-        self.catFrame = Frame(self.cat, width = 194, height = 25)
+        self.catFrame = Frame(self.cat, width = 194, height = 30)
         self.catFrame.pack_propagate(0)
 
         # download location border
@@ -1191,7 +1198,7 @@ class Settings(Frame):
         self.letsGo = ttk.Button(self.buttonFrame, text = "Let's Go!")
         self.help = Button(self.buttonFrame, text = "Help",
                            bg = "#ff4500") 
-        self.help.bind("<Enter>", lambda e: self.help.configure(bg = "#9494ff"))
+        self.help.bind("<Enter>", lambda e: self.change_color())
       
         # subreddit entry
         self.subreddits = ttk.Entry(self.subredditF, width = 59)
@@ -1236,7 +1243,7 @@ class Settings(Frame):
         self.onOff.set(rp.Config.nsfw())
         # nsfw checkbutton config
         self.nsfw = ttk.Checkbutton(self.checks, text = "On",
-                                variable = self.onOff)
+                                    variable = self.onOff)
        
         # cycletime txt
         self.ctTxt = ttk.Label(self.ctFrame, text = "Set for:")
@@ -1280,7 +1287,7 @@ class Settings(Frame):
         self.nsfw.pack(side = "left", anchor = "nw", pady = 5,
                        padx = (0, 5))
         # top holds dimensions and user/pass labelFrames
-        self.top.pack(side = "top", anchor = "w", pady = (10, 10))
+        self.top.pack(side = "top", anchor = "w", pady = 10)
         self.subredditF.pack(side = "top", anchor = "w",
                                 padx = (15, 10))
         self.dlFrame.pack(side = "top", anchor = "w", pady = 10,
@@ -1289,16 +1296,22 @@ class Settings(Frame):
         self.dimensions.pack(side = "left", anchor = "nw", pady = (0, 10),
                              padx = (15, 5))
         self.res.pack(side = "top")
-        self.midTop.pack(side = "left", padx = 10) 
+        self.midTop.pack(side = "left", padx = 5) 
         self.checks.pack(side = "top")
         self.checksFrame.pack(side = "top", anchor = "nw",
                          padx = 5)
-        self.maxLabel.pack(side = "top", pady = 10)
+        self.maxLabel.pack(side = "top", pady = 14)
         # cycletime and category frame
         self.cat.pack(side = "top")
         self.ct.pack(side = "bottom", pady = 5)
-        self.topRt.pack(side = "left", anchor = "nw", padx = (5, 5))
+        self.topRt.pack(side = "left", anchor = "nw", padx = 5)
 
+    def change_color(self):
+        if self.help['bg'] == "#9494ff":
+            self.help.configure(bg = "#ff4500")
+        else:
+            self.help.configure(bg = "#9494ff")
+    
     def help_box(self, parent):
         """ 
             Help box for when a user needs to better understand
@@ -1317,18 +1330,18 @@ class Settings(Frame):
         self.Message.pack_label("*Picture Resolution* Specifies the minimum"\
                                 " width and height required to add a wallpaper"\
                                 " to the queue.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*Adult Content* When the box is checked it will"
                                 " filter out wallpapers that are NSFW.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*Section* Specifies what category to pull from"
                                 " on Reddit. Most of the time when browsing Reddit"
                                 " you are browsing hot by default",
-                                font =  Fonts.S(),
+                                font =  Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*# of Posts* The number of posts to search"
@@ -1336,28 +1349,28 @@ class Settings(Frame):
                                 " X number of posts will be searched through. If"
                                 " using a multireddit, a breadth-first-search is"
                                 " performed.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*Wallpaper Timer* How long the wallpaper will be"
                                 " set as the background.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w', 
                                 pady = 5)
         self.Message.pack_label("*Subreddits* Enter subreddits separated by a space."
                                 " More than one subreddit to search through is supported.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*Download Location* This is where the pictures will"
                                 " be downloaded to.",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
         self.Message.pack_label("*Direct Download Link* Enter a full URL to a picture"
                                 " to be set as the wallpaper. This link is most commonly"
                                 " found by right clicking, then 'open image in new tab'",
-                                font = Fonts.S(),
+                                font = Fonts.M(),
                                 anchor = 'w',
                                 pady = 5)
     def get_values(self):
@@ -1411,8 +1424,8 @@ class Settings(Frame):
             errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
-        if values['-dl'][values['-dl'].rfind('\\'):] != values['-dl'][-1:]:
-            errors.append("Make sure path ends with a '\\' " + values['-dl'])
+        if values['-dl'][values['-dl'].rfind('/'):] != values['-dl'][-1:]:
+            errors.append("Make sure path ends with a '/' " + values['-dl'])
 
         return errors
 
@@ -1444,7 +1457,7 @@ class Settings(Frame):
                 # passed as cmd line args
                 # the key will be the switch for the arg
                 self.argList += " " + k + " " + str(v)
-        self.argList = "python.exe " + self.argList
+        self.argList = "python3.4 " + self.argList
         # call main function with cmd line args
         rp.log.debug("Argument list is: " + self.argList)
         
