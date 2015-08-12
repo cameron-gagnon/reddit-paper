@@ -1400,12 +1400,12 @@ class Settings(Frame):
         # if len(values) != 7:
         #     errors.append("Please fill in all settings options")
         #     return errors
-        if not str(values['-mw']).isdigit():
+        if not str(values['-mw']).isdigit() or int(values['-mw']) <= 0:
             errors.append(values['-mw'])
-        if not str(values['-mh']).isdigit():
+        if not str(values['-mh']).isdigit() or int(values['-mh']) <= 0:
             errors.append(values['-mh'])
         if not str(values['-mp']).isdigit() or\
-           int(values['-mp']) > 99:
+           (int(values['-mp']) > 99) or (int(values['-mp']) <= 0):
             errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
@@ -1416,7 +1416,7 @@ class Settings(Frame):
 
     def get_pics(self):
         """ 
-            Makes the call to redditpaper.main() to
+            Makes the call to subprocess.popen() to
             start the wallpaper scraper part of the
             program. Also collects the values to
             start the program with.
