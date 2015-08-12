@@ -32,7 +32,7 @@ import json
 import os
 import subprocess
 import re
-import sys 
+import sys
 import time
 import urllib.request
 import subprocess
