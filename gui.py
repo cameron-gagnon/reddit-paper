@@ -344,7 +344,7 @@ class ErrorMsg(Message):
             if len(text) == 1:
                 # if string, return length of string
                 length = len(text[0])
-                height = 170
+                height = 130
                 height += length // 60 * 15
                 rp.log.debug("Length of error string is: {}, "
                              "and height is: {}".format(length, height))
@@ -355,7 +355,7 @@ class ErrorMsg(Message):
                 # so to get the height, we take this and
                 # multiply it by a constant and add a base amount
                 height = len(text) * 25 + 130
-                height += length // 60 * 15
+                height += length // 60 * 20
                 rp.log.debug("Length of  max error string is: {} " 
                              "and height is {}".format(length, height))
             else:
@@ -1389,15 +1389,18 @@ class Settings(Frame):
         try:
             # convert hours to minutes, then add it to minutes, so we 
             # are only dealing with total minutes in the end
-            totalTime = float(self.ctHourE.get()) * 60
-            totalTime += float(self.ctMinE.get())
+            hours = self.ctHourE.get()
+            mins = self.ctMinE.get() 
+            totalTime = abs(float(hours)) * 60
+            totalTime += abs(float(mins))
             print("TOTAL TIME IS:::: %.2f" % totalTime)
-            self.values['-t'] = totalTime
-            CurrentImg.TIMER = int(float(self.ctHourE.get()) * 3600000 +
-                                   float(self.ctMinE.get()) * 60000)
+            self.values['-t'] = totalTime # in minutes
+            CurrentImg.TIMER = abs(float(self.ctHourE.get())) * 3600000 +\
+abs(float(self.ctMinE.get())) * 60000 #totalTime * 60000 # in milliseconds
+
         except ValueError:
-            errors.append(self.ctHourE.get())
-            errors.append(self.ctMinE.get())
+            errors.append((self.ctHourE.get(), self.ctMinE.get()))
+            #errors.append(self.ctMinE.get())
 
         return self.values, errors
 
@@ -1415,12 +1418,12 @@ class Settings(Frame):
         # if len(values) != 7:
         #     errors.append("Please fill in all settings options")
         #     return errors
-        if not str(values['-mw']).isdigit():
+        if not str(values['-mw']).isdigit() or int(values['-mw']) < 0:
             errors.append(values['-mw'])
-        if not str(values['-mh']).isdigit():
+        if not str(values['-mh']).isdigit() or int(values['-mh']) < 0:
             errors.append(values['-mh'])
         if not str(values['-mp']).isdigit() or\
-           int(values['-mp']) > 99:
+           int(values['-mp']) > 99 or int(values['-mp']) < 0:
             errors.append(values['-mp'])
         if not subs.isalnum():
             errors.append(values['-s'])
