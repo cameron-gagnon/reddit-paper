@@ -1,7 +1,8 @@
 # reddit-paper
 Automated wallpaper downloader which lets you download and set the top posts' pictures from any picture filled subreddit. ex. r/earthporn, r/spaceporn, r/imaginarystarscapes
 
-[**Windows Download Here**](https://github.com/cameron-gagnon/reddit-paper/releases/download/0.9/Reddit.Paper-1.1-win32.msi)
+**Windows Download**
+The .msi is located in the Windows branch under the folder dist. Click on view the full file and it should pop up a download. The link that will likely break is here: https://github.com/cameron-gagnon/reddit-paper/blob/windows/dist/Reddit%20Paper-1.1-win32.msi
 
 Mac and Linux distros will be coming soon.
 
