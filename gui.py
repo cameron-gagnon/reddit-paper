@@ -1378,7 +1378,7 @@ class Settings(Frame):
         self.values = {}
         self.values['-mw'] = self.minwidth.get()
         self.values['-mh'] = self.minheight.get()
-        self.values['--nsfw'] = self.onOff.get()
+        self.values['--nsfw'] = int(self.onOff.get()) # convert bool to int
         self.values['-s'] = self.subreddits.get().replace(" ", "+")
         self.values['-dl'] = self.dlLoc.get()
         self.values['-c'] =  self.catVar.get().lower()
