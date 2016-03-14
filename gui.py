@@ -27,7 +27,7 @@ class Application(Tk):
 
         # set title of application on titlebar
         self.wm_title("Reddit Paper")
-        
+
         # set theme
         theme = ttk.Style()
         theme.theme_use('clam')
@@ -35,18 +35,18 @@ class Application(Tk):
         # set up frame to hold widgets
         root = Frame(self)                              # background="bisque")
         root.pack(side = "top", fill = "both", expand = True)
-        
+
         # set minsize of application
-        self.setUpWindow() 
+        self.setUpWindow()
 
         # set docked icon in system tray
-        self.addIcon() 
-        
+        self.addIcon()
+
         # adds buttons and status bar for main page
         self.buttons = AddButtons(root, self)
-        
+
         StatusBar(master)
-        
+
         # window used to pack the pages into
         self.window = Frame(root)#bg = "cyan")         
         self.window.pack()
@@ -58,6 +58,7 @@ class Application(Tk):
 
         # frame to show on startup
         self.show_frame(CurrentImg)
+
     def show_frame(self, page):
         """
             Input: the page to display
@@ -68,7 +69,7 @@ class Application(Tk):
         # PastImgs button is clicked so that the
         # list of pictures is scrollable
         if page is PastImgs:
-            try: 
+            try:
                 frame.canvas.focus_set()
             # Throws attribute error and also a _tkinter.TclError
             # which isn't a valid keyword for some reason
@@ -78,10 +79,10 @@ class Application(Tk):
                 # all images are likely deleted from
                 # the itemFrame
                 pass
-       
+
         self.setButtonImages(page)
         frame.tkraise()
-   
+
     def setButtonImages(self, page):
         """
             Sets the button images for the top of the program to change 
@@ -170,7 +171,7 @@ class AboutInfo():
                   "BF%3abtn_donateCC_LG%2egif%3aNonHosted"
     _github = "https://github.com/cameron-gagnon/reddit-paper"
     _subreddit = "https://www.reddit.com/r/reddit_paper"
-    
+
     def version():
         return AboutInfo._version
 
@@ -179,13 +180,13 @@ class AboutInfo():
 
     def reddit():
         return AboutInfo._redditAcct
-    
+
     def subreddit():
         return AboutInfo._subreddit
 
     def PayPal():
         return AboutInfo._payPalAcct
-    
+
     def email():
         return AboutInfo._email
 
@@ -198,7 +199,7 @@ class Fonts():
     _VERDANA = "Verdana"
     _CURSOR = "hand2"
     _HYPERLINK = "#0000EE"
-    _XL = 16 
+    _XL = 16
     _L = 12
     _M = 10
     _S = 8
@@ -228,7 +229,7 @@ class Fonts():
         med_u = font.Font(family = Fonts._VERDANA, size = Fonts._M,
                           underline = True)
         return med_u
-   
+
     def L():
         l = font.Font(family = Fonts._VERDANA, size = Fonts._L)
         return l
@@ -245,7 +246,6 @@ class Fonts():
                          underline = True)
         return xl_u
 
-   
     def H1():
         h1 = font.Font(family = Fonts._VERDANA, size = Fonts._H1)
         return h1
@@ -284,7 +284,7 @@ class Message(Toplevel):
 
     def set_dimensions(self, master, w, h):
         """
-            Sets the position and size on screen for the popup 
+            Sets the position and size on screen for the popup
         """
         x = master.winfo_rootx()
         y = master.winfo_rooty()
@@ -294,7 +294,7 @@ class Message(Toplevel):
         self.minsize(width = w, height = h)
         self.maxsize(width = w, height = h)
         self.geometry('{}x{}+{}+{}'.format(w, h, x, y))
- 
+
     def delete(self):
         """
             Destroys the popup
@@ -311,7 +311,7 @@ class Message(Toplevel):
         # function declaration
         if not font:
            font = Fonts.M()
-            
+
         label = ttk.Label(self.inner_frame, anchor = anchor,
                           text = text, wraplength = 420,
                           font = font, justify = justify)
@@ -333,9 +333,9 @@ class Message(Toplevel):
 
 
 class ErrorMsg(Message):
-    
+
     def __init__(self, master, text, title = "Error!"):
-        popup = Message.__init__(self, master, title) 
+        popup = Message.__init__(self, master, title)
         length = 0
         height = 0
         self.addIcon('images/error.png')
@@ -356,17 +356,17 @@ class ErrorMsg(Message):
                 # multiply it by a constant and add a base amount
                 height = len(text) * 25 + 130
                 height += length // 60 * 20
-                rp.log.debug("Length of  max error string is: {} " 
+                rp.log.debug("Length of  max error string is: {} "
                              "and height is {}".format(length, height))
             else:
                 # no errors in CLArgs
-                pass 
+                pass
             self.pack_label("Invalid Argument(s):")
 
-        
+
         else:
             # if just a regular string that we want an error message
-            length = len(text) 
+            length = len(text)
             height = 125
             height += len(text) // 60 * 15
             self.pack_label("Invalid Argument(s):")
@@ -378,7 +378,7 @@ class ErrorMsg(Message):
         width = length * 5 + 160
         if (length * 5 + 160) > 475:
             width = 475
-        
+
         rp.log.debug("Width of ErrorMsg is {}".format(width))
         rp.log.debug("Height of ErrorMsg is {}".format(height))
         self.set_dimensions(master, width, height)
@@ -388,9 +388,9 @@ class InvalidArg(ErrorMsg):
 
     def __init__(self, master, text):
         """
-            Used spcecifically to display the CLArguments            
+            Used spcecifically to display the CLArguments
         """
-        
+
         ErrorMsg.__init__(self, master, text)
 
         if len(text) > 1:
@@ -712,7 +712,11 @@ class PastImgs(Frame, ImageFormat):
         self.frames = []
         self.already_deleted = []
         self.itemFrame = []
-        self.populate(self.canFrame, self.picList)
+        picThread = threading.Thread(target=self.populate,
+                         args=(self.canFrame, self.picList))
+        picThread.start()
+#        self.populate(self.canFrame, self.picList)
+
 
         # bottom frame for buttons
         self.bottomFrame = Frame(self)
@@ -1236,7 +1240,7 @@ class Settings(Frame):
        
         # nsfw checkbutton
         # nsfw on text
-        nsfwTxt = ttk.Label(self.checks, text = "NSFW:")
+        nsfwTxt = ttk.Label(self.checks, text = "NSFW\nfilter")
         nsfwTxt.pack(side = "left", padx = 5)
         # nsfw var config
         self.onOff = BooleanVar()
